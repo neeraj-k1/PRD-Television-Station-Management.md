@@ -403,3 +403,18 @@ The APIs are designed to support the operations of a television station, includi
 **Effects When Deletion Succeeds:**
 - Advertiser deleted_at timestamp is set to the current UTC time
 - Advertiser ID is preserved to maintain referential integrity in historical records and data is moved to archival storage based on retention policies
+
+### 4.7 Deletion Audit Requirements
+
+**Audit Trail:**
+
+- All deletion attempts (successful or prevented) must be logged with:
+  - Timestamp of deletion attempt (ISO 8601 format)
+  - User or system identifier that initiated the deletion
+  - Resource ID and type
+
+**Retention Period:**
+
+- Deletion audit logs must be retained for a minimum of 7 years
+- Deletion of critical infrastructure components must be retained for 15 years
+- Audit logs cannot be deleted or modified once created
