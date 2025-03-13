@@ -8,7 +8,7 @@ This document outlines the requirements for the Television Station Management AP
 
 ### 1.2 Scope
 
-The API's are designed to support the operations of a television station, including program scheduling, advertiser management, and rating analysis. It is intended for use by television stations and authorized external partners.
+The APIs are designed to support the operations of a television station, including program scheduling, advertiser management, and rating analysis. It is intended for use by television stations and external partners associated with the station.
 
 ## 2. Global API Specifications
 
@@ -39,8 +39,7 @@ The API's are designed to support the operations of a television station, includ
 - **Time Zone**: Always stored in UTC
 - **Precision**: Millisecond-level accuracy
 
-### 2.4 Error Response Specification
-**Detailed Error Response Schema**:
+#### 2.4.1 Error Response Schema when we have multiple errors for a particular status code
 ```json
 {
   "error_id": "ERROR_CODE",
@@ -52,12 +51,52 @@ The API's are designed to support the operations of a television station, includ
     }
   ]
 }
-
-|
-
+```
+#### 2.4.2 Error Response Schema when we have a single error for a particular status code
+```json
 {
   "error_id": "ERROR_CODE",
   "message": "ERROR_MESSAGE"
+}
+```
+
+#### 2.4.3 Error examples
+
+- `400 Bad Request`:
+
+```json
+{
+    "error_id": "VALIDATION_ERROR",
+    "errors": [
+        {
+            "id": "invalid_field_name_1",
+            "field": "field_name_1",
+            "message": "Descriptive error message explaining the validation issue."
+        },
+        {
+            "id": "invalid_field_name_2",
+            "field": "field_name_2",
+            "message": "Descriptive error message explaining the validation issue."
+        }
+    ]
+}
+```
+
+- `404 Not Found`:
+
+```json
+{
+    "error_id": "RESOURCE_NOT_FOUND",
+    "message": "Descriptive message about the missing resource."
+}
+```
+
+- `409 Conflict`:
+
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "message": "Descriptive message explaining the conflict."
 }
 ```
 
@@ -79,10 +118,33 @@ The API's are designed to support the operations of a television station, includ
 {
   "program_id": "uuid",
   "title": "string",
-  "genre": "string",
+  "genre": "DRAMA|COMEDY|NEWS|SPORTS|DOCUMENTARY|REALITY|CHILDREN|MUSIC|LIFESTYLE|OTHER",
   "description": "string",
   "duration_minutes": "decimal",
   "production_cost": "decimal",
+  "schedule": {
+    "date": "date",
+    "start_time": "time",
+    "end_time": "time",
+    "status": "PLANNED|LIVE|COMPLETED|CANCELLED",
+    "repeat_indicator": "boolean"
+  },
+  "ratings": {
+    "rating_value": "decimal",
+    "viewers_count": "integer"
+  },
+  "staff_assignments": [
+    {
+      "staff_id": "uuid"
+    }
+  ],
+  "advertising_slots": [
+    {
+      "advertiser_id": "uuid",
+      "slot_duration": "integer",
+      "price_paid": "decimal"
+    }
+  ],
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -97,24 +159,42 @@ The API's are designed to support the operations of a television station, includ
 |-------|------|----------|-------------|------------|---------|--------------|
 | `program_id` | uuid | Yes | Unique identifier for the program | Never | None | Primary identifier for the program that remains consistent throughout its lifecycle, used in all API operations and cross-references from other resources |
 | `title` | string | Yes | Descriptive title | Mutable | None | Official title of the television program that will appear in schedules, promotional materials, and viewer guides |
-| `genre` | string | Yes | Categorization of program | Mutable | None | Classification of program content (e.g., "Drama", "Comedy", "News") used for content organization, search filtering, and audience targeting |
+| `genre` | enum | Yes | One of: DRAMA, COMEDY, NEWS, SPORTS, DOCUMENTARY, REALITY, CHILDREN, MUSIC, LIFESTYLE, OTHER | Mutable | None | Classification of program content used for content organization, search filtering, and audience targeting |
 | `description` | string | No | Program description up to 5000 characters | Mutable | None | Detailed synopsis of the program content, including plot summary, themes, and key elements for viewer information and promotional purposes |
 | `duration_minutes` | decimal | Yes | Positive decimal representing duration | Mutable | None | Length of the program in minutes, used for scheduling, time slot allocation, and broadcast planning |
 | `production_cost` | decimal | No | Positive decimal representing cost | Mutable | None | Financial investment required to produce the program, used for budget management, ROI analysis, and financial reporting |
-| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Never | Current time | Precise moment when the program was first created in the system, used for audit trails and chronological ordering |
-| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Mutable | Current time | Timestamp of the most recent modification to any program field, used for change tracking and synchronization |
-| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | None | When populated, indicates the program has been soft-deleted and should be excluded from active operations while retained for archival purposes |
+| `schedule.date` | date | Yes | Valid date for broadcast | Mutable | None | Calendar date when the program is scheduled to air, used for planning and viewer information |
+| `schedule.start_time` | time | Yes | Start time in HH:MM:SS format | Mutable | None | Precise time when the program broadcast begins, critical for scheduling accuracy and viewer guidance |
+| `schedule.end_time` | time | Yes | End time in HH:MM:SS format | Mutable | None | Precise time when the program broadcast concludes, used to determine broadcast duration and subsequent program scheduling |
+| `schedule.status` | enum | Yes | One of: PLANNED, LIVE, COMPLETED, CANCELLED | Mutable | PLANNED | Current state of the scheduled broadcast that determines its visibility, modifiability, and operational handling |
+| `schedule.repeat_indicator` | boolean | No | Indicates if program is a rerun | Mutable | false | Flag indicating whether the broadcast is a first-run or repeat showing, important for programming strategy and audience metrics |
+| `ratings.rating_value` | decimal | No | Decimal value, can be fractional with Range 0.0 to 10.0 | Mutable | None | Numerical score representing the program's viewership performance, used for success measurement and comparative analysis |
+| `ratings.viewers_count` | integer | No | Number of viewers, integer | Mutable | None | Estimated total audience size for the program broadcast, critical for advertising value assessment and content decisions |
+| `ratings.analysis_complete` | boolean | No | If advanced analysis conducted | Mutable | false | Flag indicating whether sophisticated analytical methods have been applied to derive deeper insights from the rating data |
+| `staff_assignments` | array | No | Array of staff assignment objects | Mutable | [] | Collection of staff members assigned to the program, establishing the relationship between personnel and content |
+| `staff_assignments[].staff_id` | uuid | Yes | Must reference an existing staff | Mutable | None | Reference to a staff member working on the program, enabling accountability and resource allocation tracking. Relationship: Staff |
+| `advertising_slots` | array | No | Array of advertising placement objects | Mutable | [] | Collection of advertising allocations for the program, connecting advertisers to the content and managing revenue generation |
+| `advertising_slots[].advertiser_id` | uuid | Yes | Must reference existing advertiser | Mutable | None | Reference to the company purchasing advertising time during the program broadcast. Relationship: Advertiser |
+| `advertising_slots[].slot_duration` | integer | Yes | Duration in seconds | Mutable | None | Length of time allocated for the advertisement, used for scheduling and pricing calculations |
+| `advertising_slots[].price_paid` | decimal | Yes | Positive amount | Mutable | None | Financial compensation received for the advertising placement, important for revenue tracking and profitability analysis |
+| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Never | Current time | Precise moment when the program was first created in the system, used for audit trails and chronological ordering |
+| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | Current time | Timestamp of the most recent modification to any program field, used for change tracking and synchronization |
+| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | None | When populated, indicates the program has been soft-deleted and should be excluded from active operations while retained for archival purposes |
 
-### 3.2 Schedule Model
+### 3.2 Staff Model
 ```json
 {
-  "schedule_id": "uuid",
-  "program_id": "uuid",
-  "date": "date",
-  "start_time": "time",
-  "end_time": "time",
-  "status": "PLANNED|LIVE|COMPLETED|CANCELLED",
-  "repeat_indicator": "boolean",
+  "staff_id": "uuid",
+  "first_name": "string",
+  "last_name": "string",
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
+  "email": "string",
+  "phone": "string",
+  "program_history": [
+    {
+      "program_id": "uuid"
+    }
+  ],
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -127,16 +207,17 @@ The API's are designed to support the operations of a television station, includ
 
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|--------------|
-| `schedule_id` | uuid | Yes | Unique identifier for the schedule | Never | None | Primary identifier for the schedule entry that remains consistent throughout its lifecycle, used in all API operations and cross-references |
-| `program_id` | uuid | Yes | Must reference an existing program | Never | None | Reference to the program being scheduled, establishing the relationship between programming content and broadcast timing |
-| `date` | date | Yes | Valid date for the schedule | Mutable | None | Calendar date when the program is scheduled to air, used for planning and viewer information |
-| `start_time` | time | Yes | Start time in HH:MM:SS format | Mutable | None | Precise time when the program broadcast begins, critical for scheduling accuracy and viewer guidance |
-| `end_time` | time | Yes | End time in HH:MM:SS format | Mutable | None | Precise time when the program broadcast concludes, used to determine broadcast duration and subsequent program scheduling |
-| `status` | enum | Yes | One of PLANNED, LIVE, COMPLETED, CANCELLED | Mutable | PLANNED | Current state of the scheduled broadcast that determines its visibility, modifiability, and operational handling |
-| `repeat_indicator` | boolean | No | Indicates if program is a rerun | Mutable | false | Flag indicating whether the broadcast is a first-run or repeat showing, important for programming strategy and audience metrics |
-| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Never | Current time | Precise moment when the schedule entry was first created in the system, used for audit trails and chronological ordering |
-| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Mutable | Current time | Timestamp of the most recent modification to any schedule field, used for change tracking and synchronization |
-| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | None | When populated, indicates the schedule has been soft-deleted and should be excluded from active operations while retained for archival purposes |
+| `staff_id` | uuid | Yes | Unique identifier for staff | Never | None | Primary identifier for the staff member that remains consistent throughout their employment, used in all API operations and cross-references |
+| `first_name` | string | Yes | Staff's first name, characters only | Mutable | None | Given name of the staff member, used for identification, communications, and personalization |
+| `last_name` | string | Yes | Staff's last name, characters only | Mutable | None | Family name of the staff member, used for identification, communications, and formal documentation |
+| `role` | enum | Yes | One of: PRODUCER, DIRECTOR, EDITOR, ANCHOR, MANAGER | Mutable | None | Job title or functional position within the organization, determining access rights and reporting structure |
+| `email` | string | Yes | Valid professional email | Mutable | None | Official work email address for the staff member, used for communications, system access, and notifications |
+| `phone` | string | No | Contact number in E.164 format | Mutable | None | Work contact number for the staff member, used for direct communications and emergency contact purposes |
+| `program_history` | array | No | Array of program contribution objects | Mutable | [] | Historical record of programs the staff member has worked on, tracking experience and specialization over time.|
+| `program_history[].program_id` | uuid | Yes | Must reference existing program | Mutable | None | Reference to a program the staff member contributed to, connecting personnel to content production history. Relationship: Program |
+| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Never | Current time | Precise moment when the staff record was first created in the system, used for audit trails and employment tracking |
+| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | Current time | Timestamp of the most recent modification to any staff field, used for change tracking and personnel management |
+| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | None | When populated, indicates the staff record has been soft-deleted and should be excluded from active operations while retained for historical purposes |
 
 ### 3.3 Advertiser Model
 ```json
@@ -145,12 +226,19 @@ The API's are designed to support the operations of a television station, includ
   "name": "string",
   "email": "string",
   "phone": "string",
-  "industry": "string",
   "contract_end_date": "date",
-  "ad_placement": {
+  "advertisement_details": {
     "target_time_slot": "string",
-    "pricing": "decimal"
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
+    "budget": "decimal"
   },
+  "program_placements": [
+    {
+      "program_id": "uuid",
+      "slot_count": "integer",
+      "total_value": "decimal"
+    }
+  ],
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -167,79 +255,17 @@ The API's are designed to support the operations of a television station, includ
 | `name` | string | Yes | Full name of advertiser | Mutable | None | Official name of the advertising entity, used for identification, billing, and relationship management |
 | `email` | string | Yes | Valid email format | Mutable | None | Primary contact email address for the advertiser, used for communications, account notifications, and document delivery |
 | `phone` | string | Yes | Contact phone in E.164 format | Mutable | None | Primary contact phone number for the advertiser, used for urgent communications and verification purposes |
-| `industry` | string | Yes | Industry segment | Mutable | None | Business sector classification of the advertiser, used for targeting, analytics, and market segmentation |
 | `contract_end_date` | date | No | End date of advertising contract | Mutable | None | Expiration date of the current advertising agreement, critical for renewal planning and contract management |
-| `ad_placement.target_time_slot` | string | No | Target for ad placement timing | Mutable | None | Preferred broadcast time for advertisements, used to align with target audience viewing patterns and maximize effectiveness |
-| `ad_placement.pricing` | decimal | No | Pricing in decimal, must be positive | Mutable | None | Financial rate charged for advertisement placement, used for revenue forecasting, billing, and financial reporting |
-| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Never | Current time | Precise moment when the advertiser record was first created in the system, used for audit trails and chronological ordering |
-| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Mutable | Current time | Timestamp of the most recent modification to any advertiser field, used for change tracking and relationship management |
-| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | None | When populated, indicates the advertiser has been soft-deleted and should be excluded from active operations while retained for archival purposes |
-
-### 3.4 Rating Model
-```json
-{
-  "rating_id": "uuid",
-  "program_id": "uuid",
-  "date": "date",
-  "rating_value": "decimal",
-  "viewers_count": "integer",
-  "complex_aspects": {
-    "rating_analysis": "boolean"
-  },
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp"
-  }
-}
-```
-
-#### Field Specifications
-
-| Field | Type | Required | Constraints | Mutability | Default | Description |
-|-------|------|----------|-------------|------------|---------|--------------|
-| `rating_id` | uuid | Yes | Unique identifier for a rating | Never | None | Primary identifier for the rating record that remains consistent throughout its lifecycle, used in all API operations and analytics |
-| `program_id` | uuid | Yes | Must reference an existing program | Never | None | Reference to the program being rated, establishing the relationship between content and performance metrics |
-| `date` | date | Yes | Date of the rating with format YYYY-MM-DD | Mutable | None | Calendar date when the viewership measurement was taken, used for time-based analysis and trend identification |
-| `rating_value` | decimal | Yes | Decimal value, can be fractional with Range 0.0 to 10.0 | Mutable | None | Numerical score representing the program's viewership performance, used for success measurement and comparative analysis |
-| `viewers_count` | integer | Yes | Number of viewers, integer | Mutable | None | Estimated total audience size for the program broadcast, critical for advertising value assessment and content decisions |
-| `complex_aspects.rating_analysis` | boolean | No | If advanced analysis conducted | Mutable | false | Flag indicating whether sophisticated analytical methods have been applied to derive deeper insights from the rating data |
-| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Never | Current time | Precise moment when the rating record was first created in the system, used for audit trails and chronological ordering |
-| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Mutable | Current time | Timestamp of the most recent modification to any rating field, used for change tracking and data integrity |
-| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | None | When populated, indicates the rating has been soft-deleted and should be excluded from active operations while retained for historical analysis |
-
-### 3.5 Staff Model
-```json
-{
-  "staff_id": "uuid",
-  "first_name": "string",
-  "last_name": "string",
-  "role": "string",
-  "email": "string",
-  "phone": "string",
-  "responsibilities": "string",
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp"
-  }
-}
-```
-
-#### Field Specifications
-
-| Field | Type | Required | Constraints | Mutability | Default | Description |
-|-------|------|----------|-------------|------------|---------|--------------|
-| `staff_id` | uuid | Yes | Unique identifier for staff | Never | None | Primary identifier for the staff member that remains consistent throughout their employment, used in all API operations and cross-references |
-| `first_name` | string | Yes | Staff's first name, characters only | Mutable | None | Given name of the staff member, used for identification, communications, and personalization |
-| `last_name` | string | Yes | Staff's last name, characters only | Mutable | None | Family name of the staff member, used for identification, communications, and formal documentation |
-| `role` | string | Yes | Position or role assigned | Mutable | None | Job title or functional position within the organization, determining responsibilities, access rights, and reporting structure |
-| `email` | string | Yes | Valid professional email | Mutable | None | Official work email address for the staff member, used for communications, system access, and notifications |
-| `phone` | string | No | Contact number in E.164 format | Mutable | None | Work contact number for the staff member, used for direct communications and emergency contact purposes |
-| `responsibilities` | string | Yes | Detailed responsibilities, max 500 characters | Mutable | None | Specific duties and accountabilities assigned to the staff member, clarifying their function and performance expectations |
-| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Never | Current time | Precise moment when the staff record was first created in the system, used for audit trails and employment tracking |
-| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Mutable | Current time | Timestamp of the most recent modification to any staff field, used for change tracking and personnel management |
-| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | None | When populated, indicates the staff record has been soft-deleted and should be excluded from active operations while retained for historical purposes |
+| `advertisement_details.target_time_slot` | string | No | Preferred broadcast time | Mutable | None | Preferred broadcast time for advertisements, used to align with target audience viewing patterns and maximize effectiveness |
+| `advertisement_details.pricing_tier` | enum | No | One of: PREMIUM, STANDARD, ECONOMY, PROMOTIONAL | Mutable | STANDARD | Qualitative classification of the advertising rate structure, determining budget allocation and service level expectations |
+| `advertisement_details.budget` | decimal | No | Total campaign budget | Mutable | None | Maximum financial allocation for the advertising campaign, used for planning, resource allocation, and financial forecasting |
+| `program_placements` | array | No | Array of program placement objects | Mutable | [] | Collection of programs where advertisements have been or will be placed, linking advertisers to specific content.|
+| `program_placements[].program_id` | uuid | Yes | Must reference existing program | Mutable | None | Reference to a program where the advertiser's content will be shown, establishing the relationship between advertiser and content. Relationship: Program |
+| `program_placements[].slot_count` | integer | Yes | Number of ad slots purchased | Mutable | None | Quantity of advertising opportunities allocated within the referenced program, used for capacity planning and inventory management |
+| `program_placements[].total_value` | decimal | Yes | Financial value of placement | Mutable | None | Cumulative monetary value of all advertising slots within the program, used for revenue forecasting and financial reporting |
+| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Never | Current time | Precise moment when the advertiser record was first created in the system, used for audit trails and chronological ordering |
+| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | Current time | Timestamp of the most recent modification to any advertiser field, used for change tracking and relationship management |
+| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | None | When populated, indicates the advertiser has been soft-deleted and should be excluded from active operations while retained for archival purposes |
 
 ## 4. Business Rules
 
@@ -255,10 +281,10 @@ The API's are designed to support the operations of a television station, includ
 - If the `status` is `LIVE`, then the `start_time` and `end_time` fields become immutable.
 
 #### 4.1.3 Advertiser Model
-- `contract_end_date` is required when `ad_placement.pricing` is provided.
+- `contract_end_date` is required when `advertisement_details.pricing_tier` is provided.
 
 #### 4.1.4 Rating Model
-- `complex_aspects.rating_analysis` must be true when `viewers_count` exceeds 1 million.
+- Rating records with `viewers_count` exceeding 1 million require additional verification.
 
 #### 4.1.5 Staff Model
 
@@ -296,7 +322,7 @@ The API's are designed to support the operations of a television station, includ
 - A Program cannot be scheduled more than 3 times in a 24-hour period unless `repeat_indicator` is true
 
 #### 4.3.2 Advertiser-Schedule Validation
-- Advertiser `ad_placement.target_time_slot` must be compatible with available Schedule slots
+- Advertiser `advertisement_details.target_time_slot` must be compatible with available Schedule slots
 - Ad placements from competing Advertisers in the same `industry` must maintain minimum separation
 - When Advertiser status changes to `Archived`, all pending ad placements must be automatically reassigned
 - Advertisers with `contract_end_date` in the past cannot have new ad placements scheduled
@@ -330,7 +356,7 @@ Rollback Scenarios:
 #### 4.4.2 Advertiser Campaign Management
 1. Create Advertiser profile with contact information
 2. Define contract terms including `contract_end_date`
-3. Set `ad_placement.target_time_slot` preferences
+3. Set `advertisement_details.target_time_slot` preferences
 4. Allocate time slots in Schedule
 5. Associate advertising content with allocated slots
 6. Review campaign performance via Rating data
@@ -941,10 +967,11 @@ Request Body Schema:
   "name": "string",                 // Required, Full name of advertiser
   "email": "string",                // Required, Valid email format
   "phone": "string",                // Required, E.164 format
-  "industry": "string",             // Required, Industry segment
-  "ad_placement": {
-    "target_time_slot": "string",   // Optional, target time slot for ad placement
-    "pricing": "decimal"            // Optional, must be positive if provided
+  "contract_end_date": "date",     // Required, End date of advertising contract
+  "advertisement_details": {
+    "target_time_slot": "string",   // Required, target time slot for ad placement
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",  // Required, must be one of the specified values
+    "budget": "decimal"              // Required, must be positive if provided
   }
 }
 ```
@@ -994,10 +1021,11 @@ Response Codes:
   "name": "string",
   "email": "string",
   "phone": "string",
-  "industry": "string",
-  "ad_placement": {
+  "contract_end_date": "date",
+  "advertisement_details": {
     "target_time_slot": "string",
-    "pricing": "decimal"
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
+    "budget": "decimal"
   },
   "metadata": {
     "created_at": "timestamp",
@@ -1033,10 +1061,11 @@ Request Body Schema:
   "name": "string",                 // Optional
   "email": "string",                // Optional
   "phone": "string",                // Optional
-  "industry": "string",             // Optional
-  "ad_placement": {
+  "contract_end_date": "date",       // Optional
+  "advertisement_details": {
     "target_time_slot": "string",   // Optional, should align with valid schedule time slots
-    "pricing": "decimal"            // Optional
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",  // Optional
+    "budget": "decimal"              // Optional
   }
 }
 ```
@@ -1049,10 +1078,11 @@ Response Codes:
   "name": "string",
   "email": "string",
   "phone": "string",
-  "industry": "string",
-  "ad_placement": {
+  "contract_end_date": "date",
+  "advertisement_details": {
     "target_time_slot": "string",
-    "pricing": "decimal"
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
+    "budget": "decimal"
   },
   "metadata": {
     "created_at": "timestamp",
@@ -1178,11 +1208,9 @@ Request Body Schema:
   "rating_id": "uuid",             // Required, Unique, Immutable
   "program_id": "uuid",            // Required, Must reference an existing program
   "date": "date",                  // Required, Date of rating
-  "rating_value": "decimal",       // Required, Can be fractional
+  "rating_value": "decimal",         // Required, Can be fractional
   "viewers_count": "integer",      // Required, Number of viewers
-  "complex_aspects": {
-    "rating_analysis": "boolean"   // Optional, Default: false
-  }
+  "analysis_complete": "boolean"  // Optional, Default: false
 }
 ```
 
@@ -1239,9 +1267,7 @@ Response Codes:
   "date": "date",
   "rating_value": "decimal",
   "viewers_count": "integer",
-  "complex_aspects": {
-    "rating_analysis": "boolean"
-  },
+  "analysis_complete": "boolean",
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -1274,11 +1300,9 @@ Request Body Schema:
 ```json
 {
   "date": "date",                   // Optional
-  "rating_value": "decimal",        // Optional
-  "viewers_count": "integer",       // Optional
-  "complex_aspects": {
-    "rating_analysis": "boolean"    // Optional
-  }
+  "rating_value": "decimal",          // Optional
+  "viewers_count": "integer",          // Optional
+  "analysis_complete": "boolean"       // Optional
 }
 ```
 
@@ -1291,9 +1315,7 @@ Response Codes:
   "date": "date",
   "rating_value": "decimal",
   "viewers_count": "integer",
-  "complex_aspects": {
-    "rating_analysis": "boolean"
-  },
+  "analysis_complete": "boolean",
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -1425,10 +1447,14 @@ Request Body Schema:
   "staff_id": "uuid",              // Required, Unique, Immutable
   "first_name": "string",          // Required, Characters only
   "last_name": "string",           // Required, Characters only
-  "role": "string",                // Required, Position or role assigned
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",  // Required, Position or role assigned
   "email": "string",               // Required, Valid professional email
   "phone": "string",               // Optional, E.164 format
-  "responsibilities": "string"     // Required, Max 500 characters
+  "program_history": [
+    {
+      "program_id": "uuid"
+    }
+  ]
 }
 ```
 
@@ -1476,10 +1502,14 @@ Response Codes:
   "staff_id": "uuid",
   "first_name": "string",
   "last_name": "string",
-  "role": "string",
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
   "email": "string",
   "phone": "string",
-  "responsibilities": "string",
+  "program_history": [
+    {
+      "program_id": "uuid"
+    }
+  ],
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -1513,10 +1543,14 @@ Request Body Schema:
 {
   "first_name": "string",          // Optional
   "last_name": "string",           // Optional
-  "role": "string",                // Optional
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",  // Optional
   "email": "string",               // Optional
   "phone": "string",               // Optional
-  "responsibilities": "string"     // Optional
+  "program_history": [
+    {
+      "program_id": "uuid"
+    }
+  ]
 }
 ```
 
@@ -1527,10 +1561,14 @@ Response Codes:
   "staff_id": "uuid",
   "first_name": "string",
   "last_name": "string",
-  "role": "string",
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
   "email": "string",
   "phone": "string",
-  "responsibilities": "string",
+  "program_history": [
+    {
+      "program_id": "uuid"
+    }
+  ],
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
