@@ -134,10 +134,10 @@ The APIs are designed to support the operations of a television station, includi
   "duration_minutes": "decimal",
   "production_cost": "decimal",
   "schedule": {
-    "date": "date",
-    "start_time": "time",
-    "end_time": "time",
-    "status": "PLANNED|LIVE|COMPLETED|CANCELLED",
+  "date": "date",
+  "start_time": "time",
+  "end_time": "time",
+  "status": "PLANNED|LIVE|COMPLETED|CANCELLED",
     "repeat_indicator": "boolean"
   },
   "ratings": {
@@ -418,3 +418,1147 @@ The APIs are designed to support the operations of a television station, includi
 - Deletion audit logs must be retained for a minimum of 7 years
 - Deletion of critical infrastructure components must be retained for 15 years
 - Audit logs cannot be deleted or modified once created
+
+## 5. Television Station Management API Endpoints
+
+### 5.1 Program Management Endpoints
+
+#### 5.1.1 Create Program
+**URL:** POST /api/v1/programs
+
+**Request Body Schema:**
+```json
+{
+  "title": "string",
+  "genre": "DRAMA|COMEDY|NEWS|SPORTS|DOCUMENTARY|REALITY|CHILDREN|MUSIC|LIFESTYLE|OTHER",
+  "description": "string",
+  "duration_minutes": "decimal",
+  "production_cost": "decimal",
+  "schedule": {
+    "date": "YYYY-MM-DD",
+    "start_time": "HH:MM:SS",
+    "end_time": "HH:MM:SS",
+    "status": "PLANNED",
+    "repeat_indicator": false
+  }
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+  "program_id": "uuid",
+  "title": "string",
+  "metadata": {
+    "created_at": "timestamp"
+  }
+}
+```
+
+**Possible Error Responses:**
+
+- **400 Bad Request (Validation Errors):**
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "MISSING_TITLE",
+      "field": "title",
+      "message": "Title is required and must be unique among active programs."
+    },
+    {
+      "id": "INVALID_DURATION",
+      "field": "duration_minutes",
+      "message": "Duration must be a positive decimal aligned to standard time slots."
+    },
+    {
+      "id": "INVALID_GENRE",
+      "field": "genre",
+      "message": "Genre must be a valid television genre from DRAMA, COMEDY, NEWS, SPORTS, DOCUMENTARY, REALITY, CHILDREN, MUSIC, LIFESTYLE, or OTHER."
+    }
+  ]
+}
+```
+
+- **409 Conflict:**
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "message": "A program with the same title already exists among active programs."
+}
+```
+
+- **422 Unprocessable Entity:**
+```json
+{
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "errors": [
+    {
+      "id": "INVALID_SCHEDULE_TIMING",
+      "field": "schedule",
+      "message": "Schedule start_time and end_time must be valid and align with slots."
+    },
+    {
+      "id": "MISSING_ANCHOR_FOR_NEWS",
+      "field": "staff_assignments",
+      "message": "A NEWS program must have at least one ANCHOR assigned."
+    }
+  ]
+}
+```
+
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.1.2 Get Program
+**URL:** GET /api/v1/programs/{programId}
+
+**Success Response (200 OK):**
+```json
+{
+  "program_id": "uuid",
+  "title": "string",
+  "genre": "DRAMA",
+  "description": "string",
+  "duration_minutes": 60,
+  "production_cost": 75000,
+  "schedule": {
+    "date": "YYYY-MM-DD",
+    "start_time": "HH:MM:SS",
+    "end_time": "HH:MM:SS",
+    "status": "PLANNED",
+    "repeat_indicator": false
+  },
+  "ratings": {
+    "rating_value": 8.5,
+    "viewers_count": 15000
+  },
+  "staff_assignments": [
+    { "staff_id": "uuid" }
+  ],
+  "advertising_slots": [
+    {
+      "advertiser_id": "uuid",
+      "slot_duration (minutes)": 15,
+      "price_paid": 2000
+    }
+  ],
+  "metadata": {
+    "created_at": "timestamp",
+    "updated_at": "timestamp",
+    "deleted_at": null
+  }
+}
+```
+
+**Possible Error:**
+
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Program not found."
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.1.3 Update Program
+**URL:** PATCH /api/v1/programs/{programId}
+
+**Request Body Schema:**
+```json
+{
+  "title": "string",
+  "description": "string",
+  "duration_minutes": "decimal",
+  "production_cost": "decimal",
+  "schedule": {
+    "date": "YYYY-MM-DD",
+    "start_time": "HH:MM:SS",
+    "end_time": "HH:MM:SS",
+    "status": "LIVE|CANCELLED|COMPLETED",
+    "repeat_indicator": true
+  }
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "program_id": "uuid",
+  "title": "string",
+  "metadata": {
+    "updated_at": "timestamp"
+  }
+}
+```
+
+**Possible Error Responses:**
+
+- **400 Bad Request:**
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "INVALID_STATUS_TRANSITION",
+      "field": "schedule.status",
+      "message": "Invalid status transition."
+    },
+    {
+      "id": "INVALID_GENRE",
+      "field": "genre",
+      "message": "Genre must be a valid television genre from DRAMA, COMEDY, NEWS, SPORTS, DOCUMENTARY, REALITY, CHILDREN, MUSIC, LIFESTYLE, or OTHER."
+    }
+  ]
+}
+```
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Program not found."
+}
+```
+
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.1.4 Delete Program
+**URL:** DELETE /api/v1/programs/{programId}
+
+**Success Response:**
+- **204 No Content**
+
+**Possible Error Responses:**
+
+- **409 Conflict:**
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "message": "Cannot delete a program with LIVE status or active advertising commitments."
+}
+```
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Program not found."
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.1.5 Bulk Delete Programs
+**URL:** DELETE /api/v1/programs/bulk
+
+**Request Body Schema:**
+```json
+{
+  "program_ids": ["uuid", "uuid"]
+}
+```
+**Response Codes:**:  
+- 200 OK – Returns results of bulk deletion  
+```json
+{
+  "successful_deletions": ["uuid", "uuid"],
+  "failed_deletions": [
+    {
+      "id": "uuid",
+      "reason": "PROGRAM_NOT_FOUND"
+    },
+    {
+      "id": "uuid",
+      "reason": "PROGRAM_IN_LIVE_STATUS"
+    }
+  ],
+  "deleted_count": 2,
+  "failed_count": 2
+}
+```
+
+**Possible Errors:**
+- 400 Bad Request  
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "message": "Program IDs are required to delete programs"
+}
+```  
+- 500 Internal Server Error  
+```json
+{
+  "error_id": "SERVER_ERROR",
+  "message": "An unexpected error occurred"
+}
+```
+
+### 5.2 Staff Management Endpoints
+
+#### 5.2.1 Create Staff
+**URL:** POST /api/v1/staff
+
+**Request Body Schema:**
+```json
+{
+  "first_name": "string",
+  "last_name": "string",
+  "email": "string",
+  "phone": "string",
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
+  "status": "ACTIVE"
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+  "staff_id": "uuid",
+  "email": "string",
+  "metadata": {
+  "created_at": "timestamp"
+  }
+}
+```
+
+**Possible Error Responses:**
+
+- **400 Bad Request:**
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "MISSING_FIRST_NAME",
+      "field": "first_name",
+      "message": "First name is required."
+    },
+    {
+      "id": "MISSING_EMAIL",
+      "field": "email",
+      "message": "Email is required and must be unique."
+    },
+    {
+      "id": "INVALID_PHONE_FORMAT",
+      "field": "phone",
+      "message": "Phone must be in E.164 format."
+    },
+    {
+      "id": "INVALID_ROLE",
+      "field": "role",
+      "message": "Role must be a valid staff role from PRODUCER, DIRECTOR, EDITOR, ANCHOR, or MANAGER."
+    }
+  ]
+}
+```
+- **409 Conflict:**
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "message": "Staff with this email already exists."
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.2.2 Get Staff
+**URL:** GET /api/v1/staff/{staffId}
+
+**Success Response (200 OK):**
+```json
+{
+  "staff_id": "uuid",
+  "first_name": "string",
+  "last_name": "string",
+  "email": "string",
+  "phone": "string",
+  "role": "EDITOR",
+  "status": "ACTIVE",
+  "metadata": {
+    "created_at": "timestamp",
+    "updated_at": "timestamp",
+    "deleted_at": null
+  }
+}
+```
+
+**Possible Error:**
+
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Staff not found."
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.2.3 Update Staff
+**URL:** PATCH /api/v1/staff/{staffId}
+
+**Request Body Schema:**
+```json
+{
+  "first_name": "string",
+  "last_name": "string",
+  "email": "string",
+  "phone": "string",
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
+  "status": "ACTIVE|INACTIVE"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "staff_id": "uuid",
+  "metadata": {
+    "updated_at": "timestamp"
+  }
+}
+```
+
+**Possible Error Responses:**
+
+- **400 Bad Request:**
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "INVALID_PHONE_FORMAT",
+      "field": "phone",
+      "message": "Phone must be in E.164 format."
+    },
+    {
+      "id": "INVALID_ROLE",
+      "field": "role",
+      "message": "Role must be a valid staff role from PRODUCER, DIRECTOR, EDITOR, ANCHOR, or MANAGER."
+    }
+  ]
+}
+```
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Staff not found."
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.2.4 Delete Staff
+**URL:** DELETE /api/v1/staff/{staffId}
+
+**Success Response:**
+- **204 No Content**
+
+**Possible Error Responses:**
+
+- **409 Conflict:**
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "message": "Cannot delete an active staff member or one assigned to upcoming programs."
+}
+```
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Staff not found."
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+#### 5.2.5 Bulk Delete Staff
+**URL:** DELETE /api/v1/staff/bulk
+
+**Request Body Schema:**
+```json
+{
+  "staff_ids": ["uuid", "uuid"]
+}
+```
+**Success Response:**
+- **200 OK**
+```json
+{
+  "successful_deletions": ["uuid", "uuid"],
+  "failed_deletions": [
+    {
+      "id": "uuid",
+      "reason": "STAFF_NOT_FOUND"
+    }
+  ],
+  "deleted_count": 2,
+  "failed_count": 2
+}
+```
+
+**Possible Error Responses:**
+
+- **400 Bad Request:**
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "message": "Staff IDs are required to delete staff"
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+### 5.3 Advertiser Management Endpoints
+
+#### 5.3.1 Create Advertiser
+**URL:** POST /api/v1/advertisers
+
+**Request Body Schema:**
+```json
+{
+  "name": "string",
+  "email": "string",
+  "phone": "string",
+  "contract_end_date": "YYYY-MM-DD",
+  "advertisement_details": {
+    "target_time_slot": "HH:MM:SS",
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
+    "budget": "decimal"
+  }
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+  "advertiser_id": "uuid",
+  "name": "string",
+  "metadata": {
+  "created_at": "timestamp"
+  }
+}
+```
+
+**Possible Error Responses:**
+
+- **400 Bad Request:**
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "MISSING_NAME",
+      "field": "name",
+      "message": "Advertiser name is required."
+    },
+    {
+      "id": "INVALID_EMAIL_FORMAT",
+      "field": "email",
+      "message": "Email must be a valid email address."
+    },
+    {
+      "id": "INVALID_PHONE_FORMAT",
+      "field": "phone",
+      "message": "Phone must be in E.164 format."
+    }
+  ]
+}
+```
+
+- **409 Conflict:**
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "message": "Advertiser with this email already exists."
+}
+```
+
+- **422 Unprocessable Entity:**
+```json
+{
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "errors": [
+    {
+      "id": "INSUFFICIENT_BUDGET_FOR_PREMIUM",
+      "field": "advertisement_details.budget",
+      "message": "Minimum budget for PREMIUM tier must be 50,000."
+    },
+    {
+      "id": "INVALID_TIME_SLOT",
+      "field": "advertisement_details.target_time_slot",
+      "message": "Target time slot is invalid."
+    }
+  ]
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.3.2 Get Advertiser
+**URL:** GET /api/v1/advertisers/{advertiserId}
+
+**Success Response (200 OK):**
+```json
+{
+  "advertiser_id": "uuid",
+  "name": "string",
+  "email": "string",
+  "phone": "string",
+  "contract_end_date": "YYYY-MM-DD",
+  "advertisement_details": {
+    "target_time_slot": "HH:MM:SS",
+    "pricing_tier": "STANDARD",
+    "budget": 30000
+  },
+  "program_placements": [
+    {
+  "program_id": "uuid",
+      "slot_count": 2,
+      "total_value": 4000
+    }
+  ],
+  "metadata": {
+    "created_at": "timestamp",
+    "updated_at": "timestamp",
+    "deleted_at": null
+  }
+}
+```
+
+**Possible Error:**
+
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Advertiser not found."
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.3.3 Update Advertiser
+**URL:** PATCH /api/v1/advertisers/{advertiserId}
+
+**Request Body Schema:**
+```json
+{
+  "name": "string",
+  "email": "string",
+  "phone": "string",
+  "contract_end_date": "YYYY-MM-DD",
+  "advertisement_details": {
+    "target_time_slot": "HH:MM:SS",
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
+    "budget": "decimal"
+  }
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "advertiser_id": "uuid",
+  "metadata": {
+    "updated_at": "timestamp"
+  }
+}
+```
+
+**Possible Error Responses:**
+
+- **400 Bad Request:**
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "INVALID_EMAIL_FORMAT",
+      "field": "email",
+      "message": "Email must be a valid email address."
+    },
+    {
+      "id": "INVALID_PHONE_FORMAT",
+      "field": "phone",
+      "message": "Phone must be in E.164 format."
+    },
+    {
+      "id": "INVALID_PRICING_TIER",
+      "field": "advertisement_details.pricing_tier",
+      "message": "Pricing tier must be PREMIUM, STANDARD, ECONOMY, or PROMOTIONAL."
+    },
+    {
+      "id": "BUDGET_BELOW_MINIMUM",
+      "field": "advertisement_details.budget",
+      "message": "Budget for PREMIUM tier must be at least 50,000."
+    }
+  ]
+}
+```
+
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Advertiser not found."
+}
+```
+
+- **422 Unprocessable Entity:**
+```json
+{
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "errors": [
+    {
+      "id": "INVALID_TIME_SLOT",
+      "field": "advertisement_details.target_time_slot",
+      "message": "Target time slot is invalid."
+    },
+    {
+      "id": "BUDGET_EXCEEDED",
+      "field": "advertisement_details.budget",
+      "message": "Total program placements value exceeds the specified budget."
+    }
+  ]
+}
+```
+
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+#### 5.3.4 Delete Advertiser
+**URL:** DELETE /api/v1/advertisers/{advertiserId}
+
+**Success Response:**
+- **204 No Content**
+
+**Possible Error Responses:**
+
+- **409 Conflict:**
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "message": "Cannot delete advertiser with active contracts or scheduled advertisements."
+}
+```
+
+- **404 Not Found:**
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Advertiser not found."
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
+## 6. Television Station Management Workflow Examples
+
+### 6.1 Program Scheduling and Broadcast Workflow
+
+**Steps:**
+1. Create a New Program
+2. Assign Required Staff
+3. Allocate Advertising Slots
+4. Transition Program to LIVE Status
+5. Complete the Broadcast
+
+#### Step 1: Create a New Program
+
+**Request:**
+```json
+POST /api/v1/programs
+Content-Type: application/json
+
+{
+  "title": "Evening News",
+  "genre": "NEWS",
+  "description": "Daily evening news program covering local and national events",
+  "duration_minutes": 60,
+  "production_cost": 25000,
+  "schedule": {
+    "date": "2024-06-15",
+    "start_time": "19:00:00",
+    "end_time": "20:00:00",
+    "status": "PLANNED",
+    "repeat_indicator": false
+  }
+}
+```
+
+**Response:** 201 Created
+```json
+{
+  "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Evening News",
+  "metadata": {
+    "created_at": "2024-05-20T14:30:45.123Z"
+  }
+}
+```
+
+#### Step 2: Assign Required Staff
+
+**Request:**
+```json
+PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
+Content-Type: application/json
+
+{
+  "staff_assignments": [
+    {"staff_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"}, // PRODUCER
+    {"staff_id": "b2c3d4e5-f6a5-4b8c-7d9e-0f1a2b3c4d5e"}  // ANCHOR
+  ]
+}
+```
+
+**Response:** 200 OK
+```json
+{
+  "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "metadata": {
+    "updated_at": "2024-05-20T14:35:22.456Z"
+  }
+}
+```
+
+**Error Scenario - Missing Required Staff Role:**
+
+If attempting to schedule a NEWS program without an ANCHOR:
+
+**Response:** 422 Unprocessable Entity
+```json
+{
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "message": "A NEWS program must have at least one ANCHOR assigned."
+}
+```
+
+#### Step 3: Allocate Advertising Slots
+
+**Request:**
+```json
+PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
+Content-Type: application/json
+
+{
+  "advertising_slots": [
+    {
+      "advertiser_id": "d4e5f6a5-b8c7-4d9e-0f1a-2b3c4d5e6f7a",
+      "slot_duration (minutes)": 2,
+      "price_paid": 5000
+    },
+    {
+      "advertiser_id": "e5f6a5b8-c7d9-4e0f-1a2b-3c4d5e6f7a8b",
+      "slot_duration (minutes)": 1,
+      "price_paid": 2500
+    }
+  ]
+}
+```
+
+**Response:** 200 OK
+```json
+{
+  "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "metadata": {
+    "updated_at": "2024-05-20T14:40:15.789Z"
+  }
+}
+```
+
+**Error Scenario - Advertiser Budget Exceeded:**
+
+**Response:** 422 Unprocessable Entity
+```json
+{
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "message": "Advertiser e5f6a5b8-c7d9-4e0f-1a2b-3c4d5e6f7a8b has insufficient budget for this placement."
+}
+```
+
+#### Step 4: Transition Program to LIVE Status
+
+**Request:**
+```json
+PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
+Content-Type: application/json
+
+{
+  "schedule": {
+    "status": "LIVE"
+  }
+}
+```
+
+**Response:** 200 OK
+```json
+{
+  "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "metadata": {
+    "updated_at": "2024-06-15T19:00:05.123Z"
+  }
+}
+```
+
+**Error Scenario - Invalid Status Transition:**
+
+If attempting to transition directly from PLANNED to COMPLETED:
+
+**Response:** 400 Bad Request
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "message": "Cannot transition directly from PLANNED to COMPLETED. Program must be LIVE first."
+}
+```
+
+#### Step 5: Complete the Broadcast
+
+**Request:**
+```json
+PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
+Content-Type: application/json
+
+{
+  "schedule": {
+    "status": "COMPLETED"
+  },
+  "ratings": {
+    "rating_value": 8.5,
+    "viewers_count": 250000
+  }
+}
+```
+
+**Response:** 200 OK
+```json
+{
+  "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "metadata": {
+    "updated_at": "2024-06-15T20:00:15.456Z"
+  }
+}
+```
+
+### 6.2 Advertiser Management
+
+**Steps:**
+1. Create Advertiser Profile
+2. Allocate Advertising Slots to Programs
+
+#### Step 1: Create Advertiser Profile
+
+**Request:**
+```json
+POST /api/v1/advertisers
+Content-Type: application/json
+
+{
+  "name": "Global Electronics",
+  "email": "advertising@globalelectronics.com",
+  "phone": "+12025550179",
+  "contract_end_date": "2024-12-31",
+  "advertisement_details": {
+    "target_time_slot": "19:30:00",
+    "pricing_tier": "PREMIUM",
+    "budget": 75000
+  }
+}
+```
+
+**Response:** 201 Created
+```json
+{
+  "advertiser_id": "d4e5f6a5-b8c7-4d9e-0f1a-2b3c4d5e6f7a",
+  "name": "Global Electronics",
+  "metadata": {
+    "created_at": "2024-05-15T10:15:30.123Z"
+  }
+}
+```
+
+#### Step 2: Allocate Advertising Slots to Programs
+
+**Request:**
+```
+PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
+Content-Type: application/json
+
+[
+  {
+    "advertiser_id": "d4e5f6a5-b8c7-4d9e-0f1a-2b3c4d5e6f7a",
+    "slot_duration (minutes)": 2,
+    "price_paid": 5000
+  }
+]
+```
+
+**Response:** 200 OK
+```json
+{
+  "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "metadata": {
+    "updated_at": "2024-05-15T10:20:45.789Z"
+  }
+}
+```
+
+### 6.3 Staff Assignment and Workflow Management
+
+**Steps:**
+1. Create Staff Record
+2. Assign Staff to Program
+
+#### Step 1: Create Staff Record
+
+**Request:**
+```json
+POST /api/v1/staff
+Content-Type: application/json
+
+{
+  "first_name": "Jane",
+  "last_name": "Smith",
+  "email": "jane.smith@tvstation.com",
+  "phone": "+12025550143",
+  "role": "PRODUCER"
+}
+```
+
+**Response:** 201 Created
+```json
+{
+  "staff_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+  "email": "jane.smith@tvstation.com",
+  "metadata": {
+    "created_at": "2024-05-10T09:30:15.123Z"
+  }
+}
+```
+
+**Error Scenario - Email Domain Validation:**
+
+**Response:** 400 Bad Request
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "INVALID_EMAIL_DOMAIN",
+      "field": "email",
+      "message": "Email domain must match the organization's approved domain list."
+    }
+  ]
+}
+```
+
+#### Step 2: Assign Staff to Program
+
+**Request:**
+```json
+PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
+Content-Type: application/json
+
+[
+  {
+    "staff_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"
+  }
+]
+```
+
+**Response:** 200 OK
+```json
+{
+  "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "metadata": {
+    "updated_at": "2024-05-10T09:35:45.789Z"
+  }
+}
+```
+
+**Error Scenario - Overlapping Assignments:**
+
+**Response:** 409 Conflict
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "errors": [
+    {
+      "id": "OVERLAPPING_ASSIGNMENT",
+      "field": "staff_id",
+      "message": "Staff member is already assigned to another program with overlapping broadcast time."
+    }
+  ]
+}
+```
