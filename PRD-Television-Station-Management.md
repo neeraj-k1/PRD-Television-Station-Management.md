@@ -22,7 +22,7 @@ The APIs are designed to support the operations of a television station, includi
 - Resource IDs should be UUIDs
 - When a resource ID is invalid or not found, always return 404 (no validation of UUID format)
 - Resources: programs, staff, advertisers
-- Complex aspects: Manage program scheduling, staff assignments, and advertiser placements. The platform supports the creation of new program genres and the management of existing ones. The platofmr also support ratings and viewership analysis.
+- Complex aspects: Manage program scheduling, staff assignments, and advertiser placements. The platform supports the creation of new program genres and the management of existing ones. The platform also support ratings and viewership analysis.
 
 ### 2.2 Base URL Configuration
 - **Exact Base URL**: `/api/v1`
@@ -107,6 +107,21 @@ The APIs are designed to support the operations of a television station, includi
 - Include unique error identifiers for log tracking
 - Maintain consistency across all endpoints
 
+### 2.5 Field Validation Principles
+- **String Fields**:
+  - Length constraints explicitly defined
+  - Trimmed of leading/trailing whitespaces
+  - Cannot be empty unless explicitly allowed
+
+- **Numeric Fields**:
+  - Precise range constraints
+  - Non-negative unless explicitly specified
+
+- **Enum Fields**:
+  - Strict matching against predefined values
+  - Case-sensitive matching
+  - No default values unless specified
+
 ## 3. Comprehensive Resource Models
 
 ### 3.1 Program Model
@@ -137,7 +152,7 @@ The APIs are designed to support the operations of a television station, includi
   "advertising_slots": [
     {
       "advertiser_id": "uuid",
-      "slot_duration": "integer",
+      "slot_duration (minutes)": "integer",
       "price_paid": "decimal"
     }
   ],
@@ -163,7 +178,7 @@ The APIs are designed to support the operations of a television station, includi
 | `schedule.start_time` | time | Yes | Start time in HH:MM:SS format | Mutable | None | Precise time when the program broadcast begins, critical for scheduling accuracy and viewer guidance |
 | `schedule.end_time` | time | Yes | End time in HH:MM:SS format | Mutable | None | Precise time when the program broadcast concludes, used to determine broadcast duration and subsequent program scheduling |
 | `schedule.status` | enum | Yes | One of: PLANNED, LIVE, COMPLETED, CANCELLED | Mutable | PLANNED | Current state of the scheduled broadcast that determines its visibility, modifiability, and operational handling |
-| `schedule.repeat_indicator` | boolean | No | Indicates if program is a rerun | Mutable | false | Flag indicating whether the broadcast is a first-run or repeat showing, important for programming strategy and audience metrics |
+| `schedule.repeat_indicator` | boolean | No | Indicates if program is a rerun | Mutable | false | Flag indicating whether the broadcast is a first-run or repeat showing, important understanding the program's history |
 | `ratings.rating_value` | decimal | No | Decimal value, can be fractional with Range 0.0 to 10.0 | Mutable | None | Numerical score representing the program's viewership performance, used for success measurement and comparative analysis |
 | `ratings.viewers_count` | integer | No | Number of viewers, integer | Mutable | None | Estimated total audience size for the program broadcast, critical for advertising value assessment and content decisions |
 | `ratings.analysis_complete` | boolean | No | If advanced analysis conducted | Mutable | false | Flag indicating whether sophisticated analytical methods have been applied to derive deeper insights from the rating data |
@@ -171,7 +186,7 @@ The APIs are designed to support the operations of a television station, includi
 | `staff_assignments[].staff_id` | uuid | Yes | Must reference an existing staff | Mutable | None | Reference to a staff member working on the program, enabling accountability and resource allocation tracking. Relationship: Staff |
 | `advertising_slots` | array | No | Array of advertising placement objects | Mutable | [] | Collection of advertising allocations for the program, connecting advertisers to the content and managing revenue generation |
 | `advertising_slots[].advertiser_id` | uuid | Yes | Must reference existing advertiser | Mutable | None | Reference to the company purchasing advertising time during the program broadcast. Relationship: Advertiser |
-| `advertising_slots[].slot_duration` | integer | Yes | Duration in seconds | Mutable | None | Length of time allocated for the advertisement, used for scheduling and pricing calculations |
+| `advertising_slots[].slot_duration (minutes)` | integer | Yes | Duration in minutes | Mutable | None | Length of time allocated for the advertisement, used for scheduling and pricing calculations |
 | `advertising_slots[].price_paid` | decimal | Yes | Positive amount | Mutable | None | Financial compensation received for the advertising placement, important for revenue tracking and profitability analysis |
 | `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Never | Current time | Precise moment when the program was first created in the system, used for audit trails and chronological ordering |
 | `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | Current time | Timestamp of the most recent modification to any program field, used for change tracking and synchronization |
@@ -224,7 +239,7 @@ The APIs are designed to support the operations of a television station, includi
   "phone": "string",
   "contract_end_date": "date",
   "advertisement_details": {
-    "target_time_slot": "string",
+    "target_time_slot": "time",
     "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
     "budget": "decimal"
   },
@@ -252,7 +267,7 @@ The APIs are designed to support the operations of a television station, includi
 | `email` | string | Yes | Valid email format | Mutable | None | Primary contact email address for the advertiser, used for communications, account notifications, and document delivery |
 | `phone` | string | Yes | Contact phone in E.164 format | Mutable | None | Primary contact phone number for the advertiser, used for urgent communications and verification purposes |
 | `contract_end_date` | date | No | End date of advertising contract | Mutable | None | Expiration date of the current advertising agreement, critical for renewal planning and contract management |
-| `advertisement_details.target_time_slot` | string | No | Preferred broadcast time | Mutable | None | Preferred broadcast time for advertisements, used to align with target audience viewing patterns and maximize effectiveness |
+| `advertisement_details.target_time_slot` | time | No | Preferred broadcast time with HH:MM:SS format | Mutable | None | Preferred broadcast time for advertisements, used to align with target audience viewing patterns and maximize effectiveness |
 | `advertisement_details.pricing_tier` | enum | No | One of: PREMIUM, STANDARD, ECONOMY, PROMOTIONAL | Mutable | STANDARD | Qualitative classification of the advertising rate structure, determining budget allocation and service level expectations |
 | `advertisement_details.budget` | decimal | No | Total campaign budget | Mutable | None | Maximum financial allocation for the advertising campaign, used for planning, resource allocation, and financial forecasting |
 | `program_placements` | array | No | Array of program placement objects | Mutable | [] | Collection of programs where advertisements have been or will be placed, linking advertisers to specific content.|
@@ -270,1408 +285,121 @@ The APIs are designed to support the operations of a television station, includi
 #### 4.1.1 Program Model
 - `title` must be unique across all active programs to prevent scheduling confusion
 - `duration_minutes` must be compatible with standard broadcast time slots (typically multiples of 15 or 30 minutes)
+- `schedule.repeat_indicator` must be set to true when the same program is scheduled within a 7-day period
+- If `schedule.status` is `LIVE`, then `schedule.start_time` and `schedule.end_time` fields become immutable
 
-#### 4.1.2 Schedule Model
-- `repeat_indicator` must be set to true when the same program is scheduled within a 7-day period
-- `start_time` and `end_time` must be chronologically after the `start_time` on the same `date`.
-- If the `status` is `LIVE`, then the `start_time` and `end_time` fields become immutable.
+#### 4.1.2 Staff Model
+- `email` must be unique across all staff members
+- `email` domain must match the organization's approved domain list
 
 #### 4.1.3 Advertiser Model
-- `contract_end_date` is required when `advertisement_details.pricing_tier` is provided.
-
-#### 4.1.4 Rating Model
-- Rating records with `viewers_count` exceeding 1 million require additional verification.
-
-#### 4.1.5 Staff Model
-
+- `email` must be unique across all advertisers
+- When `advertisement_details.pricing_tier` is "PREMIUM", minimum `advertisement_details.budget` must be 50,000
+- For each advertiser, total `program_placements` value cannot exceed `advertisement_details.budget`
 
 ### 4.2 State Machine Transitions
 
-#### 4.2.1 Schedule Model
+#### 4.2.1 Program Schedule Status
 - `PLANNED` can transition to `LIVE`
 - `PLANNED` can transition to `CANCELLED`
 - `LIVE` can transition to `COMPLETED`
 - Once a schedule is `COMPLETED` or `CANCELLED`, no further transitions are allowed
 
-#### 4.2.2 Program Model (Implicit Lifecycle)
-- `Active` (deleted_at is null) can transition to `Archived` (deleted_at is set)
-- `Archived` can transition to `Active` (when deleted_at is cleared)
-
-#### 4.2.3 Advertiser Model (Implicit Lifecycle)
-- `Active` (deleted_at is null) can transition to `Archived` (deleted_at is set)
-- `Archived` can transition to `Active` only when all contract details are reviewed and revalidated
-
-#### 4.2.4 Rating Model (Implicit Lifecycle)
-- `Active` (deleted_at is null) can transition to `Archived` (deleted_at is set)
-- `Archived` ratings cannot be reactivated for data integrity purposes
-
-#### 4.2.5 Staff Model (Implicit Lifecycle)
-- `Active` (deleted_at is null) can transition to `Archived` (deleted_at is set)
-- `Archived` can transition to `Active` when a staff member returns from extended leave
-
 ### 4.3 Cross-Resource Validation Rules
 
-#### 4.3.1 Program-Schedule Validation
-- Schedule `date`, `start_time`, and `end_time` must accommodate the Program's `duration_minutes`
-- Program `genre` must be appropriate for the scheduled time slot according to regulatory guidelines
-- When a Program is archived, any associated Schedules must be either `COMPLETED` or `CANCELLED`
-- A Program cannot be scheduled more than 3 times in a 24-hour period unless `repeat_indicator` is true
+#### 4.3.1 Program-Staff Validation
+- Staff with `role` "PRODUCER" must be assigned to a Program before it can transition to `PLANNED` status
+- A Program with `genre` "NEWS" must have at least one Staff with `role` "ANCHOR" assigned
+- A Staff member cannot be assigned to more than one Program with overlapping broadcast times
 
-#### 4.3.2 Advertiser-Schedule Validation
-- Advertiser `advertisement_details.target_time_slot` must be compatible with available Schedule slots
-- Ad placements from competing Advertisers in the same `industry` must maintain minimum separation
-- When Advertiser status changes to `Archived`, all pending ad placements must be automatically reassigned
-- Advertisers with `contract_end_date` in the past cannot have new ad placements scheduled
-
-#### 4.3.3 Schedule-Rating Validation
-- Rating `date` must match a Schedule `date` for the associated Program
-- Rating records cannot be created for Schedules in `PLANNED` or `CANCELLED` status
-- A Schedule can have multiple Rating records to represent different measurement methodologies
-- If the Schedule is `CANCELLED`, any associated Rating data must be flagged as invalid
-
-#### 4.3.4 Staff-Program Validation
-- Staff with production roles must be authorized to create and modify Programs
-- Staff with scheduling roles must be authorized to create and modify Schedules
-- A Staff member cannot be assigned to more than 5 simultaneous productions
-- Staff role must be appropriate for the assigned responsibilities
+#### 4.3.2 Program-Advertiser Validation
+- Advertiser's `advertisement_details.target_time_slot` must be compatible with Program's `schedule.start_time` and `schedule.end_time`
+- When Program `schedule.status` changes to `CANCELLED`, all associated Advertisers must be notified and their advertising slots must be cancelled.
 
 ### 4.4 Multi-Step Operations
 
 #### 4.4.1 Program Broadcast Process
-1. Create Program with complete metadata
-2. Schedule the Program for broadcast
-3. Transition Schedule to `LIVE` at broadcast time
-4. Transition Schedule to `COMPLETED` after broadcast ends
-5. Collect and associate Rating data
+1. Create Program with data including title, genre, description, and duration
+2. Assign required Staff members based on Program type and requirements
+3. Schedule the Program by setting date, start_time, and end_time
+4. Allocate advertising slots based on Program duration
+5. Approve final Program schedule and resource allocations
+6. Transition schedule status to LIVE at broadcast time
+7. Process financial transactions for advertising slots
 
-Rollback Scenarios:
-- Technical difficulties: Cancel broadcast and reschedule
-- Content issues: Replace with alternative programming
-- Schedule conflict: Adjust time slot or move to different date
-
-#### 4.4.2 Advertiser Campaign Management
-1. Create Advertiser profile with contact information
-2. Define contract terms including `contract_end_date`
-3. Set `advertisement_details.target_time_slot` preferences
-4. Allocate time slots in Schedule
-5. Associate advertising content with allocated slots
-6. Review campaign performance via Rating data
-
-Rollback Scenarios:
-- Contract dispute: Suspend campaign and renegotiate terms
-- Content rejection: Request revised content from advertiser
-- Schedule changes: Reallocate to alternative time slots
-
-#### 4.4.3 Schedule Optimization Process
-1. Create initial Schedule based on programming requirements
-2. Analyze historical Rating data for optimal time slots
-3. Adjust Schedule to maximize viewer engagement
-4. Integrate Advertiser requirements and preferences
-5. Finalize optimized Schedule
-
-Rollback Scenarios:
-- Unexpected conflicts: Revert to previous schedule version
-- Regulatory issues: Adjust to comply with broadcast standards
-- Advertiser objections: Re-optimize with additional constraints
+**Rollback Scenarios:**
+- Program time slot conflicts: If a program is scheduled to air during an already scheduled program, the new program will be scheduled for a different time slot.
+- Staff unavailability: Reassign roles and reschedule program
 
 ### 4.5 Business Logic Triggers
 
 #### 4.5.1 Status Change Actions
-- When Schedule status changes to `COMPLETED`, Rating data collection is automatically initiated
-- When Program metadata is updated, all associated `PLANNED` Schedules are flagged for review
-- When Advertiser is archived, all pending ad placements are automatically flagged for reassignment
-- When Staff role changes, all assigned responsibilities are automatically reviewed for compatibility
+- When Program schedule.status changes to COMPLETED:
+  * Rating data is automatically updated.
+  * Staff program_history is automatically updated
+  * Advertising revenue is automatically calculated and recorded
+  * Program metadata.updated_at is automatically updated
+  
+- When Staff role changes:
+  * All current Program assignments are reviewed for compatibility
 
-#### 4.5.2 Automatic Updates
-- Moving Schedule to `COMPLETED` automatically updates `metadata.updated_at`
-- Creating a new Program automatically sets `metadata.created_at` to current timestamp
-- Updating any Advertiser field automatically updates `metadata.updated_at`
-- Setting any resource's `deleted_at` field automatically excludes it from standard API responses
+#### 4.5.2 Automatic Calculations
+- Program broadcast duration is verified against schedule.start_time and schedule.end_time
+- Advertiser campaign remaining budget is recalculated after each advertisement placement
+- Program profitability is calculated by comparing production_cost against advertising revenue
 
 #### 4.5.3 Cascading Actions
-- When a Program is archived, all future Schedules are flagged for review or cancellation
-- When an Advertiser's `contract_end_date` passes, all ad placements are automatically ended
-- When a Staff member is archived, all assigned responsibilities are automatically reassigned
-- When a Schedule is cancelled, all associated ad placements are automatically rescheduled
+- When a Program is archived:
+  * All future broadcasts are automatically cancelled
+  * Associated staff are notified and assignments cleared
+  * Advertising slots are made unavailable
+  * Program content is moved to long-term storage
+  
+- When an Advertiser's contract_end_date passes:
+  * All future ad placements are cancelled
 
 ### 4.6 Deletion Behavior
 
 #### 4.6.1 Program Model
 
 **Prevention Criteria:**
-- Cannot delete a Program referenced by any Schedule with status `PLANNED` or `LIVE`
-- Cannot delete a Program that has active advertising contracts associated with it
-- Cannot delete a Program with significant historical Rating data (over 1 million viewers)
+- Cannot delete a Program with schedule.status of LIVE
+- Cannot delete a Program with active advertising commitments
 
 **Cascade Effects:**
-- All future Schedules referencing the Program are flagged for review
-- Rating data is preserved for historical analysis
+- Staff assignments are removed from the Program
+- Advertising slots are cancelled and advertisers notified
+- Ratings data is preserved for historical analysis
 
 **Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Program is excluded from future scheduling options
-- Program metadata is preserved for archival purposes
+- Program deleted_at timestamp is set to the current UTC time
+- Program ID is preserved to maintain referential integrity in historical records and data is moved to archival storage based on retention policies
 
-#### 4.6.2 Schedule Model
+#### 4.6.2 Staff Model
 
 **Prevention Criteria:**
-- Cannot delete a Schedule if `status` is `LIVE`
-- Cannot delete a Schedule if it has active Advertiser placements
-- Cannot delete a Schedule within 24 hours of its `start_time` unless status is `CANCELLED`
+- Cannot delete a Staff member assigned to any Program with schedule.status LIVE
 
 **Cascade Effects:**
-- Associated Rating data is flagged as "Schedule Deleted"
-- Advertiser placements are automatically rescheduled
+- All future Program assignments are reassigned or flagged for reassignment
 
 **Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Schedule is removed from broadcast planning tools
-- Historical broadcast data is preserved for reporting
+- Staff deleted_at timestamp is set to the current UTC time
+- Staff record is excluded from active assignment pools
+- Staff ID is preserved to maintain referential integrity in historical records and data is moved to archival storage based on retention policies
 
 #### 4.6.3 Advertiser Model
 
 **Prevention Criteria:**
-- Cannot delete an Advertiser if current date is before `contract_end_date`
-- Cannot delete an Advertiser with active ad placements in upcoming Schedules
+- Cannot delete an Advertiser with current date before contract_end_date
+- Cannot delete an Advertiser with scheduled advertisements in Programs with status LIVE
 - Cannot delete an Advertiser with outstanding financial transactions
 
 **Cascade Effects:**
-- All ad placements are marked for review
-- Contact information is archived according to data retention policies
+- All future advertising placements are cancelled
+- Contract information is archived according to financial retention policies
+- Advertising content is archived according to content retention policies
 
 **Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Advertiser is excluded from new campaign opportunities
-- Historical advertising data is preserved for reporting and analytics
-
-#### 4.6.4 Rating Model
-
-**Prevention Criteria:**
-- Cannot delete Rating data that is less than 7 days old
-- Cannot delete Rating data used in active analytics or reports
-- Cannot delete Rating data for Programs that are still in active rotation
-
-**Cascade Effects:**
-- Associated analytical reports are flagged for recalculation
-- Historical trends are preserved for long-term analysis
-
-**Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Rating is excluded from current performance metrics
-- Historical data is preserved for trend analysis
-
-#### 4.6.5 Staff Model
-
-**Prevention Criteria:**
-- Cannot delete Staff records for individuals with active production assignments
-- Cannot delete Staff records referenced in current broadcasts
-- Cannot delete Staff records with administrative system access
-
-**Cascade Effects:**
-- Production responsibilities are reassigned
-- System access is revoked
-- Contact information is archived
-
-**Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Staff member is removed from assignment options
-- Employment history is preserved for compliance purposes
-
-## 5. Program, Schedule, Advertiser, Rating, and Staff API Endpoints
-
-─────────────────────────────────────────
-5.1 Program Endpoints
-
-─────────────────────────────────────────
-5.1.1 Create Program
-URL: POST /api/v1/programs
-
-Request Body Schema:
-```json
-{
-  "program_id": "uuid",              // Required, Unique, Immutable
-  "title": "string",                 // Required, Descriptive title
-  "genre": "string",                 // Required, Categorization of program
-  "description": "string",           // Optional, up to 5000 characters
-  "duration_minutes": "decimal"      // Required, Positive decimal representing duration
-}
-```
-
-Response Codes:
-201 Created: Program successfully created
-```json
-{
-  "program_id": "uuid",
-  "title": "string",
-  "created_at": "timestamp"
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 409 Conflict
-```json
-{
-  "error_id": "RESOURCE_CONFLICT",
-  "message": "Program already exists or conflicts with constraints"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.1.2 Get Program
-URL: GET /api/v1/programs/{programId}
-
-Response Codes:
-200 OK: Returns program details
-```json
-{
-  "program_id": "uuid",
-  "title": "string",
-  "genre": "string",
-  "description": "string",
-  "duration_minutes": "decimal",
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "The requested program does not exist"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.1.3 Update Program
-URL: PATCH /api/v1/programs/{programId}
-
-Request Body Schema:
-```json
-{
-  "title": "string",                 // Optional, cannot update program_id or metadata.created_at
-  "genre": "string",                 // Optional
-  "description": "string",           // Optional
-  "duration_minutes": "decimal"      // Optional
-}
-```
-
-Response Codes:
-200 OK: Program successfully updated
-```json
-{
-  "program_id": "uuid",
-  "title": "string",
-  "genre": "string",
-  "description": "string",
-  "duration_minutes": "decimal",
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Program not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.1.4 Delete Program
-URL: DELETE /api/v1/programs/{programId}
-
-Response Codes:
-204 No Content: Program successfully deleted (soft delete)
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "DELETE_PREVENTED",
-  "message": "Program deletion prevented due to associated LIVE or COMPLETED schedules"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Program not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.1.5 Bulk Delete Programs
-URL: DELETE /api/v1/programs
-
-Request Body Schema:
-```json
-{
-  "program_ids": ["uuid", "uuid", "uuid"]
-}
-```
-
-Response Codes:
-200 OK: Returns results of bulk deletion operation
-```json
-{
-  "successful_deletions": ["uuid", "uuid"],
-  "failed_deletions": [
-    {
-      "id": "uuid",
-      "reason": "PROGRAM_HAS_ACTIVE_SCHEDULES"
-    }
-  ],
-  "deleted_count": 2,
-  "failed_count": 1
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 403 Forbidden
-```json
-{
-  "error_id": "INSUFFICIENT_PERMISSIONS",
-  "message": "Bulk deletion is not permitted"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.2 Schedule Endpoints
-
-─────────────────────────────────────────
-5.2.1 Create Schedule
-URL: POST /api/v1/schedules
-
-Request Body Schema:
-```json
-{
-  "schedule_id": "uuid",             // Required, Unique, Immutable
-  "program_id": "uuid",              // Required, Must reference an existing program
-  "date": "date",                    // Required, Valid date
-  "start_time": "time",              // Required, Format HH:MM:SS
-  "end_time": "time",                // Required, Format HH:MM:SS
-  "status": "PLANNED|LIVE|COMPLETED|CANCELLED",  // Required, Default: PLANNED
-}
-```
-
-Response Codes:
-201 Created: Schedule successfully created
-```json
-{
-  "schedule_id": "uuid",
-  "program_id": "uuid",
-  "created_at": "timestamp"
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 409 Conflict
-```json
-{
-  "error_id": "RESOURCE_CONFLICT",
-  "message": "Schedule conflicts with existing records or violates constraints"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Referenced program not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.2.2 Get Schedule
-URL: GET /api/v1/schedules/{scheduleId}
-
-Response Codes:
-200 OK: Returns schedule details
-```json
-{
-  "schedule_id": "uuid",
-  "program_id": "uuid",
-  "date": "date",
-  "start_time": "time",
-  "end_time": "time",
-  "status": "PLANNED|LIVE|COMPLETED|CANCELLED",
-  "complex_aspects": {
-    "schedule_optimization": "boolean"
-  },
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Schedule not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.2.3 Update Schedule
-URL: PATCH /api/v1/schedules/{scheduleId}
-
-Request Body Schema:
-```json
-{
-  "date": "date",                    // Optional
-  "start_time": "time",              // Optional
-  "end_time": "time",                // Optional
-  "status": "PLANNED|LIVE|COMPLETED|CANCELLED",  // Optional (Note: Transition rules apply: PLANNED → LIVE → COMPLETED or CANCELLED)
-  "complex_aspects": {
-    "schedule_optimization": "boolean"         // Optional
-  }
-}
-```
-
-Response Codes:
-200 OK: Schedule successfully updated
-```json
-{
-  "schedule_id": "uuid",
-  "program_id": "uuid",
-  "date": "date",
-  "start_time": "time",
-  "end_time": "time",
-  "status": "PLANNED|LIVE|COMPLETED|CANCELLED",
-  "complex_aspects": {
-    "schedule_optimization": "boolean"
-  },
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed or state transition is invalid"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Schedule not found"
-}
-```
-• 409 Conflict
-```json
-{
-  "error_id": "INVALID_STATE_TRANSITION",
-  "message": "Cannot transition schedule to the requested state"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.2.4 Delete Schedule
-URL: DELETE /api/v1/schedules/{scheduleId}
-
-Response Codes:
-204 No Content: Schedule successfully deleted (soft delete)
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "DELETE_PREVENTED",
-  "message": "Schedule deletion prevented in LIVE or COMPLETED state"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Schedule not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.2.5 Bulk Delete Schedules
-URL: DELETE /api/v1/schedules
-
-Request Body Schema:
-```json
-{
-  "schedule_ids": ["uuid", "uuid", "uuid"]
-}
-```
-
-Response Codes:
-200 OK: Returns results of bulk deletion operation
-```json
-{
-  "successful_deletions": ["uuid", "uuid"],
-  "failed_deletions": [
-    {
-      "id": "uuid",
-      "reason": "SCHEDULE_IN_NON_DELETABLE_STATE"
-    }
-  ],
-  "deleted_count": 2,
-  "failed_count": 1
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 403 Forbidden
-```json
-{
-  "error_id": "INSUFFICIENT_PERMISSIONS",
-  "message": "Bulk deletion not permitted"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.3 Advertiser Endpoints
-
-─────────────────────────────────────────
-5.3.1 Create Advertiser
-URL: POST /api/v1/advertisers
-
-Request Body Schema:
-```json
-{
-  "advertiser_id": "uuid",          // Required, Unique, Immutable
-  "name": "string",                 // Required, Full name of advertiser
-  "email": "string",                // Required, Valid email format
-  "phone": "string",                // Required, E.164 format
-  "contract_end_date": "date",     // Required, End date of advertising contract
-  "advertisement_details": {
-    "target_time_slot": "string",   // Required, target time slot for ad placement
-    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",  // Required, must be one of the specified values
-    "budget": "decimal"              // Required, must be positive if provided
-  }
-}
-```
-
-Response Codes:
-201 Created: Advertiser successfully created
-```json
-{
-  "advertiser_id": "uuid",
-  "name": "string",
-  "created_at": "timestamp"
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 409 Conflict
-```json
-{
-  "error_id": "RESOURCE_CONFLICT",
-  "message": "Advertiser already exists or violates constraints"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.3.2 Get Advertiser
-URL: GET /api/v1/advertisers/{advertiserId}
-
-Response Codes:
-200 OK: Returns advertiser details
-```json
-{
-  "advertiser_id": "uuid",
-  "name": "string",
-  "email": "string",
-  "phone": "string",
-  "contract_end_date": "date",
-  "advertisement_details": {
-    "target_time_slot": "string",
-    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
-    "budget": "decimal"
-  },
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Advertiser not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.3.3 Update Advertiser
-URL: PATCH /api/v1/advertisers/{advertiserId}
-
-Request Body Schema:
-```json
-{
-  "name": "string",                 // Optional
-  "email": "string",                // Optional
-  "phone": "string",                // Optional
-  "contract_end_date": "date",       // Optional
-  "advertisement_details": {
-    "target_time_slot": "string",   // Optional, should align with valid schedule time slots
-    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",  // Optional
-    "budget": "decimal"              // Optional
-  }
-}
-```
-
-Response Codes:
-200 OK: Advertiser successfully updated
-```json
-{
-  "advertiser_id": "uuid",
-  "name": "string",
-  "email": "string",
-  "phone": "string",
-  "contract_end_date": "date",
-  "advertisement_details": {
-    "target_time_slot": "string",
-    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
-    "budget": "decimal"
-  },
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Advertiser not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.3.4 Delete Advertiser
-URL: DELETE /api/v1/advertisers/{advertiserId}
-
-Response Codes:
-204 No Content: Advertiser successfully deleted (soft delete)
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "DELETE_PREVENTED",
-  "message": "Advertiser deletion prevented due to upcoming scheduled ad placements"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Advertiser not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.3.5 Bulk Delete Advertisers
-URL: DELETE /api/v1/advertisers
-
-Request Body Schema:
-```json
-{
-  "advertiser_ids": ["uuid", "uuid", "uuid"]
-}
-```
-
-Response Codes:
-200 OK: Returns results of bulk deletion operation
-```json
-{
-  "successful_deletions": ["uuid", "uuid"],
-  "failed_deletions": [
-    {
-      "id": "uuid",
-      "reason": "UPCOMING_AD_PLACEMENT"
-    }
-  ],
-  "deleted_count": 2,
-  "failed_count": 1
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 403 Forbidden
-```json
-{
-  "error_id": "INSUFFICIENT_PERMISSIONS",
-  "message": "Bulk deletion not permitted"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.4 Rating Endpoints
-
-─────────────────────────────────────────
-5.4.1 Create Rating
-URL: POST /api/v1/ratings
-
-Request Body Schema:
-```json
-{
-  "rating_id": "uuid",             // Required, Unique, Immutable
-  "program_id": "uuid",            // Required, Must reference an existing program
-  "date": "date",                  // Required, Date of rating
-  "rating_value": "decimal",         // Required, Can be fractional
-  "viewers_count": "integer",      // Required, Number of viewers
-  "analysis_complete": "boolean"  // Optional, Default: false
-}
-```
-
-Response Codes:
-201 Created: Rating successfully created
-```json
-{
-  "rating_id": "uuid",
-  "program_id": "uuid",
-  "created_at": "timestamp"
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 409 Conflict
-```json
-{
-  "error_id": "RESOURCE_CONFLICT",
-  "message": "Rating conflicts with existing records"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Referenced program not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.4.2 Get Rating
-URL: GET /api/v1/ratings/{ratingId}
-
-Response Codes:
-200 OK: Returns rating details
-```json
-{
-  "rating_id": "uuid",
-  "program_id": "uuid",
-  "date": "date",
-  "rating_value": "decimal",
-  "viewers_count": "integer",
-  "analysis_complete": "boolean",
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional (archived)
-  }
-}
-```
-
-Possible Errors:
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Rating not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.4.3 Update Rating
-URL: PATCH /api/v1/ratings/{ratingId}
-
-Request Body Schema:
-```json
-{
-  "date": "date",                   // Optional
-  "rating_value": "decimal",          // Optional
-  "viewers_count": "integer",          // Optional
-  "analysis_complete": "boolean"       // Optional
-}
-```
-
-Response Codes:
-200 OK: Rating successfully updated
-```json
-{
-  "rating_id": "uuid",
-  "program_id": "uuid",
-  "date": "date",
-  "rating_value": "decimal",
-  "viewers_count": "integer",
-  "analysis_complete": "boolean",
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Update validation failed"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Rating not found"
-}
-```
-• 409 Conflict
-```json
-{
-  "error_id": "INVALID_STATE_TRANSITION",
-  "message": "Rating cannot be updated in its archived state"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.4.4 Delete Rating
-URL: DELETE /api/v1/ratings/{ratingId}
-
-Response Codes:
-204 No Content: Rating successfully archived (soft delete; actual deletion is prevented)
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "DELETE_PREVENTED",
-  "message": "Ratings cannot be permanently deleted; use archive instead"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Rating not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.4.5 Bulk Delete Ratings
-URL: DELETE /api/v1/ratings
-
-Request Body Schema:
-```json
-{
-  "rating_ids": ["uuid", "uuid", "uuid"]
-}
-```
-
-Response Codes:
-200 OK: Returns results of bulk deletion (archival) operation
-```json
-{
-  "successful_deletions": ["uuid", "uuid"],
-  "failed_deletions": [
-    {
-      "id": "uuid",
-      "reason": "RATING_ALREADY_ARCHIVED"
-    }
-  ],
-  "deleted_count": 2,
-  "failed_count": 1
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 403 Forbidden
-```json
-{
-  "error_id": "INSUFFICIENT_PERMISSIONS",
-  "message": "Bulk archival is not permitted"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.5 Staff Endpoints
-
-─────────────────────────────────────────
-5.5.1 Create Staff
-URL: POST /api/v1/staff
-
-Request Body Schema:
-```json
-{
-  "staff_id": "uuid",              // Required, Unique, Immutable
-  "first_name": "string",          // Required, Characters only
-  "last_name": "string",           // Required, Characters only
-  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",  // Required, Position or role assigned
-  "email": "string",               // Required, Valid professional email
-  "phone": "string",               // Optional, E.164 format
-  "program_history": [
-    {
-      "program_id": "uuid"
-    }
-  ]
-}
-```
-
-Response Codes:
-201 Created: Staff successfully created
-```json
-{
-  "staff_id": "uuid",
-  "first_name": "string",
-  "created_at": "timestamp"
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 409 Conflict
-```json
-{
-  "error_id": "RESOURCE_CONFLICT",
-  "message": "Staff member already exists or violates constraints"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.5.2 Get Staff
-URL: GET /api/v1/staff/{staffId}
-
-Response Codes:
-200 OK: Returns staff details
-```json
-{
-  "staff_id": "uuid",
-  "first_name": "string",
-  "last_name": "string",
-  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
-  "email": "string",
-  "phone": "string",
-  "program_history": [
-    {
-      "program_id": "uuid"
-    }
-  ],
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Staff member not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.5.3 Update Staff
-URL: PATCH /api/v1/staff/{staffId}
-
-Request Body Schema:
-```json
-{
-  "first_name": "string",          // Optional
-  "last_name": "string",           // Optional
-  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",  // Optional
-  "email": "string",               // Optional
-  "phone": "string",               // Optional
-  "program_history": [
-    {
-      "program_id": "uuid"
-    }
-  ]
-}
-```
-
-Response Codes:
-200 OK: Staff successfully updated
-```json
-{
-  "staff_id": "uuid",
-  "first_name": "string",
-  "last_name": "string",
-  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
-  "email": "string",
-  "phone": "string",
-  "program_history": [
-    {
-      "program_id": "uuid"
-    }
-  ],
-  "metadata": {
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "deleted_at": "timestamp" // optional
-  }
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Staff member not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.5.4 Delete Staff
-URL: DELETE /api/v1/staff/{staffId}
-
-Response Codes:
-204 No Content: Staff successfully deleted (soft delete)
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "DELETE_PREVENTED",
-  "message": "Staff deletion is prevented for archived records"
-}
-```
-• 404 Not Found
-```json
-{
-  "error_id": "RESOURCE_NOT_FOUND",
-  "message": "Staff member not found"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
-
-─────────────────────────────────────────
-5.5.5 Bulk Delete Staff
-URL: DELETE /api/v1/staff
-
-Request Body Schema:
-```json
-{
-  "staff_ids": ["uuid", "uuid", "uuid"]
-}
-```
-
-Response Codes:
-200 OK: Returns results of bulk deletion operation
-```json
-{
-  "successful_deletions": ["uuid", "uuid"],
-  "failed_deletions": [
-    {
-      "id": "uuid",
-      "reason": "STAFF_ARCHIVED_OR_IN_USE"
-    }
-  ],
-  "deleted_count": 2,
-  "failed_count": 1
-}
-```
-
-Possible Errors:
-• 400 Bad Request
-```json
-{
-  "error_id": "VALIDATION_ERROR",
-  "message": "Request validation failed"
-}
-```
-• 403 Forbidden
-```json
-{
-  "error_id": "INSUFFICIENT_PERMISSIONS",
-  "message": "Bulk deletion not permitted"
-}
-```
-• 500 Internal Server Error
-```json
-{
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
-}
-```
+- Advertiser deleted_at timestamp is set to the current UTC time
+- Advertiser ID is preserved to maintain referential integrity in historical records and data is moved to archival storage based on retention policies
