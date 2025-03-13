@@ -21,6 +21,8 @@ The APIs are designed to support the operations of a television station, includi
 - No performance requirements
 - Resource IDs should be UUIDs
 - When a resource ID is invalid or not found, always return 404 (no validation of UUID format)
+- Resources: programs, staff, advertisers
+- Complex aspects: Manage program scheduling, staff assignments, and advertiser placements. The platform supports the creation of new program genres and the management of existing ones. The platofmr also support ratings and viewership analysis.
 
 ### 2.2 Base URL Configuration
 - **Exact Base URL**: `/api/v1`
@@ -104,12 +106,6 @@ The APIs are designed to support the operations of a television station, includi
 - Always return appropriate HTTP status codes
 - Include unique error identifiers for log tracking
 - Maintain consistency across all endpoints
-
-### 2.5 Additional Considerations
-- **Complex Aspects**:
-  - Schedule Optimization: Ensuring program schedules are efficient and avoid conflicts
-  - Ad Placement: Strategically placing advertisements to maximize revenue and viewer engagement
-  - Rating Analysis: Analyzing viewership ratings to inform programming and advertising strategies
 
 ## 3. Comprehensive Resource Models
 
