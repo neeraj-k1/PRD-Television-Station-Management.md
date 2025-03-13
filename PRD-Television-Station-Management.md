@@ -22,7 +22,7 @@ The APIs are designed to support the operations of a television station, includi
 - Resource IDs should be UUIDs
 - When a resource ID is invalid or not found, always return 404 (no validation of UUID format)
 - Resources: programs, staff, advertisers
-- Complex aspects: Manage program scheduling, staff assignments, and advertiser placements. The platform supports the creation of new program genres and the management of existing ones. The platform also support ratings and viewership analysis.
+- Complex aspects: Manage program scheduling, staff assignments, and advertiser placements. The platform supports the creation of new programs and the management of existing ones. The platform also support ratings and viewership analysis.
 
 ### 2.2 Base URL Configuration
 - **Exact Base URL**: `/api/v1`
@@ -181,7 +181,6 @@ The APIs are designed to support the operations of a television station, includi
 | `schedule.repeat_indicator` | boolean | No | Indicates if program is a rerun | Mutable | false | Flag indicating whether the broadcast is a first-run or repeat showing, important understanding the program's history |
 | `ratings.rating_value` | decimal | No | Decimal value, can be fractional with Range 0.0 to 10.0 | Mutable | None | Numerical score representing the program's viewership performance, used for success measurement and comparative analysis |
 | `ratings.viewers_count` | integer | No | Number of viewers, integer | Mutable | None | Estimated total audience size for the program broadcast, critical for advertising value assessment and content decisions |
-| `ratings.analysis_complete` | boolean | No | If advanced analysis conducted | Mutable | false | Flag indicating whether sophisticated analytical methods have been applied to derive deeper insights from the rating data |
 | `staff_assignments` | array | No | Array of staff assignment objects | Mutable | [] | Collection of staff members assigned to the program, establishing the relationship between personnel and content |
 | `staff_assignments[].staff_id` | uuid | Yes | Must reference an existing staff | Mutable | None | Reference to a staff member working on the program, enabling accountability and resource allocation tracking. Relationship: Staff |
 | `advertising_slots` | array | No | Array of advertising placement objects | Mutable | [] | Collection of advertising allocations for the program, connecting advertisers to the content and managing revenue generation |
@@ -728,8 +727,7 @@ The APIs are designed to support the operations of a television station, includi
   "last_name": "string",
   "email": "string",
   "phone": "string",
-  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
-  "status": "ACTIVE"
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER"
 }
 ```
 
@@ -801,7 +799,6 @@ The APIs are designed to support the operations of a television station, includi
   "email": "string",
   "phone": "string",
   "role": "EDITOR",
-  "status": "ACTIVE",
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -837,8 +834,7 @@ The APIs are designed to support the operations of a television station, includi
   "last_name": "string",
   "email": "string",
   "phone": "string",
-  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER",
-  "status": "ACTIVE|INACTIVE"
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER"
 }
 ```
 
@@ -899,7 +895,7 @@ The APIs are designed to support the operations of a television station, includi
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot delete an active staff member or one assigned to upcoming programs."
+  "message": "Cannot delete staff member assigned to upcoming programs."
 }
 ```
 - **404 Not Found:**
@@ -1455,13 +1451,15 @@ Content-Type: application/json
 PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
 Content-Type: application/json
 
-[
-  {
-    "advertiser_id": "d4e5f6a5-b8c7-4d9e-0f1a-2b3c4d5e6f7a",
-    "slot_duration (minutes)": 2,
-    "price_paid": 5000
-  }
-]
+{
+  "advertising_slots": [
+    {
+      "advertiser_id": "d4e5f6a5-b8c7-4d9e-0f1a-2b3c4d5e6f7a",
+      "slot_duration (minutes)": 2,
+      "price_paid": 5000
+    }
+  ]
+}
 ```
 
 **Response:** 200 OK
@@ -1530,11 +1528,13 @@ Content-Type: application/json
 PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
 Content-Type: application/json
 
-[
-  {
-    "staff_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"
-  }
-]
+{
+  "staff_assignments": [
+    {
+      "staff_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"
+    }
+  ]
+}
 ```
 
 **Response:** 200 OK
