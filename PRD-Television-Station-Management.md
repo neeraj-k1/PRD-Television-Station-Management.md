@@ -245,7 +245,7 @@ The APIs are designed to support the operations of a television station, includi
   },
   "program_placements": [
     {
-  "program_id": "uuid",
+      "program_id": "uuid",
       "slot_count": "integer",
       "total_value": "decimal"
     }
@@ -286,6 +286,7 @@ The APIs are designed to support the operations of a television station, includi
 - `title` must be unique across all active programs to prevent scheduling confusion
 - `duration_minutes` must be compatible with standard broadcast time slots, i.e., should be less than or equal to the difference between `schedule.start_time` and `schedule.end_time`.
 - If `schedule.status` is `LIVE`, then `schedule.start_time` and `schedule.end_time` fields become immutable. And these fields should be immutable when `schedule.status` is `COMPLETED` or `CANCELLED` as well.
+- If one program is scheduled at a particular date and time slot, no other program can be scheduled at the same date and time slot.
 
 #### 4.1.2 Staff Model
 - `email` must be unique across all staff members
@@ -313,7 +314,7 @@ The APIs are designed to support the operations of a television station, includi
 
 #### 4.3.2 Program-Advertiser Validation
 - Advertiser's `advertisement_details.target_time_slot` must be compatible with Program's `schedule.start_time` and `schedule.end_time`
-- When Program `schedule.status` changes to `CANCELLED`, all associated Advertisers must be notified and their advertising slots must be cancelled.
+- When Program `schedule.status` changes to `CANCELLED`, all associated Advertisers advertising slots will be removed from the `advertising_slots` list of that program.
 
 ### 4.4 Multi-Step Operations
 
@@ -326,9 +327,6 @@ The APIs are designed to support the operations of a television station, includi
 6. Transition schedule status to LIVE at broadcast time
 7. Process financial transactions for advertising slots
 
-**Rollback Scenarios:**
-- Program time slot conflicts: If a program is scheduled to air during an already scheduled program, the new program will be scheduled for a different time slot.
-- Staff unavailability: Reassign roles and reschedule program
 
 ### 4.5 Deletion Behavior
 
@@ -421,7 +419,7 @@ The APIs are designed to support the operations of a television station, includi
   "program_id": "uuid",
   "title": "string",
   "metadata": {
-  "created_at": "timestamp"
+    "created_at": "timestamp"
   }
 }
 ```
@@ -987,7 +985,7 @@ The APIs are designed to support the operations of a television station, includi
   "advertiser_id": "uuid",
   "name": "string",
   "metadata": {
-  "created_at": "timestamp"
+    "created_at": "timestamp"
   }
 }
 ```
