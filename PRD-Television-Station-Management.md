@@ -22,7 +22,7 @@ The APIs are designed to support the operations of a television station, includi
 - Resource IDs should be UUIDs
 - When a resource ID is invalid or not found, always return 404 (no validation of UUID format)
 - Resources: programs, staff, advertisers
-- Complex aspects: Manage program scheduling, staff assignments, and advertiser placements. The platform supports the creation of new programs and the management of existing ones. The platform also support ratings and viewership analysis.
+- Complex aspects: Manage program scheduling, staff assignments, and advertiser placements. The platform supports the creation of new program and the management of existing ones. The platform also support ratings and viewership analysis.
 
 ### 2.2 Base URL Configuration
 - **Exact Base URL**: `/api/v1`
@@ -30,6 +30,7 @@ The APIs are designed to support the operations of a television station, includi
 - **Global URL Pattern**:
   - Parent Resources: `/{resource-type}`
   - Child/Nested Resources: `/{parent-resource}/{parent-id}/{child-resource}`
+  - Special Operations: `/{resource-type}/{operation}`
 
 ### 2.3 Timestamp Management
 - **Timestamp Type**: Server-managed
@@ -134,10 +135,10 @@ The APIs are designed to support the operations of a television station, includi
   "duration_minutes": "decimal",
   "production_cost": "decimal",
   "schedule": {
-  "date": "date",
-  "start_time": "time",
-  "end_time": "time",
-  "status": "PLANNED|LIVE|COMPLETED|CANCELLED",
+    "date": "date",
+    "start_time": "time",
+    "end_time": "time",
+    "status": "PLANNING|PLANNED|LIVE|COMPLETED|CANCELLED",
     "repeat_indicator": "boolean"
   },
   "ratings": {
@@ -152,7 +153,7 @@ The APIs are designed to support the operations of a television station, includi
   "advertising_slots": [
     {
       "advertiser_id": "uuid",
-      "slot_duration (minutes)": "integer",
+      "slot_duration_minutes": "integer",
       "price_paid": "decimal"
     }
   ],
@@ -173,20 +174,20 @@ The APIs are designed to support the operations of a television station, includi
 | `genre` | enum | Yes | One of: DRAMA, COMEDY, NEWS, SPORTS, DOCUMENTARY, REALITY, CHILDREN, MUSIC, LIFESTYLE, OTHER | Mutable | None | Classification of program content used for content organization, search filtering, and audience targeting |
 | `description` | string | No | Program description up to 5000 characters | Mutable | None | Detailed synopsis of the program content, including plot summary, themes, and key elements for viewer information and promotional purposes |
 | `duration_minutes` | decimal | Yes | Positive decimal representing duration | Mutable | None | Length of the program in minutes, used for scheduling, time slot allocation, and broadcast planning |
-| `production_cost` | decimal | No | Positive decimal representing cost | Mutable | None | Financial investment required to produce the program, used for budget management, ROI analysis, and financial reporting |
+| `production_cost` | decimal | No | Positive decimal representing cost in USD | Mutable | None | Financial investment required to produce the program, used for budget management, ROI analysis, and financial reporting |
 | `schedule.date` | date | Yes | Valid date for broadcast | Mutable | None | Calendar date when the program is scheduled to air, used for planning and viewer information |
 | `schedule.start_time` | time | Yes | Start time in HH:MM:SS format | Mutable | None | Precise time when the program broadcast begins, critical for scheduling accuracy and viewer guidance |
 | `schedule.end_time` | time | Yes | End time in HH:MM:SS format | Mutable | None | Precise time when the program broadcast concludes, used to determine broadcast duration and subsequent program scheduling |
-| `schedule.status` | enum | Yes | One of: PLANNED, LIVE, COMPLETED, CANCELLED | Mutable | PLANNED | Current state of the scheduled broadcast that determines its visibility, modifiability, and operational handling |
-| `schedule.repeat_indicator` | boolean | No | Indicates if program is a rerun | Mutable | false | Flag indicating whether the broadcast is a first-run or repeat showing, important understanding the program's history |
+| `schedule.status` | enum | Yes | One of: PLANNING, PLANNED, LIVE, COMPLETED, CANCELLED | Mutable | PLANNING | Current state of the scheduled broadcast that determines its visibility, modifiability, and operational handling |
+| `schedule.repeat_indicator` | boolean | No | Indicates if program is a rerun | Mutable | false | Flag indicating whether the broadcast is repeated in the last 7 days to understand about the program's history |
 | `ratings.rating_value` | decimal | No | Decimal value, can be fractional with Range 0.0 to 10.0 | Mutable | None | Numerical score representing the program's viewership performance, used for success measurement and comparative analysis |
 | `ratings.viewers_count` | integer | No | Number of viewers, integer | Mutable | None | Estimated total audience size for the program broadcast, critical for advertising value assessment and content decisions |
 | `staff_assignments` | array | No | Array of staff assignment objects | Mutable | [] | Collection of staff members assigned to the program, establishing the relationship between personnel and content |
 | `staff_assignments[].staff_id` | uuid | Yes | Must reference an existing staff | Mutable | None | Reference to a staff member working on the program, enabling accountability and resource allocation tracking. Relationship: Staff |
 | `advertising_slots` | array | No | Array of advertising placement objects | Mutable | [] | Collection of advertising allocations for the program, connecting advertisers to the content and managing revenue generation |
 | `advertising_slots[].advertiser_id` | uuid | Yes | Must reference existing advertiser | Mutable | None | Reference to the company purchasing advertising time during the program broadcast. Relationship: Advertiser |
-| `advertising_slots[].slot_duration (minutes)` | integer | Yes | Duration in minutes | Mutable | None | Length of time allocated for the advertisement, used for scheduling and pricing calculations |
-| `advertising_slots[].price_paid` | decimal | Yes | Positive amount | Mutable | None | Financial compensation received for the advertising placement, important for revenue tracking and profitability analysis |
+| `advertising_slots[].slot_duration_minutes` | integer | Yes | Duration in minutes | Mutable | None | Length of time allocated for the advertisement, used for scheduling and pricing calculations |
+| `advertising_slots[].price_paid` | decimal | Yes | Positive amount in USD | Mutable | None | Financial compensation received for the advertising placement, important for revenue tracking and profitability analysis |
 | `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Never | Current time | Precise moment when the program was first created in the system, used for audit trails and chronological ordering |
 | `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | Current time | Timestamp of the most recent modification to any program field, used for change tracking and synchronization |
 | `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | None | When populated, indicates the program has been soft-deleted and should be excluded from active operations while retained for archival purposes |
@@ -244,7 +245,7 @@ The APIs are designed to support the operations of a television station, includi
   },
   "program_placements": [
     {
-      "program_id": "uuid",
+  "program_id": "uuid",
       "slot_count": "integer",
       "total_value": "decimal"
     }
@@ -268,11 +269,11 @@ The APIs are designed to support the operations of a television station, includi
 | `contract_end_date` | date | No | End date of advertising contract | Mutable | None | Expiration date of the current advertising agreement, critical for renewal planning and contract management |
 | `advertisement_details.target_time_slot` | time | No | Preferred broadcast time with HH:MM:SS format | Mutable | None | Preferred broadcast time for advertisements, used to align with target audience viewing patterns and maximize effectiveness |
 | `advertisement_details.pricing_tier` | enum | No | One of: PREMIUM, STANDARD, ECONOMY, PROMOTIONAL | Mutable | STANDARD | Qualitative classification of the advertising rate structure, determining budget allocation and service level expectations |
-| `advertisement_details.budget` | decimal | No | Total campaign budget | Mutable | None | Maximum financial allocation for the advertising campaign, used for planning, resource allocation, and financial forecasting |
+| `advertisement_details.budget` | decimal | No | Total campaign budget in USD | Mutable | None | Maximum financial allocation for the advertising campaign, used for planning, resource allocation, and financial forecasting |
 | `program_placements` | array | No | Array of program placement objects | Mutable | [] | Collection of programs where advertisements have been or will be placed, linking advertisers to specific content.|
 | `program_placements[].program_id` | uuid | Yes | Must reference existing program | Mutable | None | Reference to a program where the advertiser's content will be shown, establishing the relationship between advertiser and content. Relationship: Program |
 | `program_placements[].slot_count` | integer | Yes | Number of ad slots purchased | Mutable | None | Quantity of advertising opportunities allocated within the referenced program, used for capacity planning and inventory management |
-| `program_placements[].total_value` | decimal | Yes | Financial value of placement | Mutable | None | Cumulative monetary value of all advertising slots within the program, used for revenue forecasting and financial reporting |
+| `program_placements[].total_value` | decimal | Yes | Financial value of placement in USD | Mutable | None | Cumulative monetary value of all advertising slots within the program, used for revenue forecasting and financial reporting |
 | `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Never | Current time | Precise moment when the advertiser record was first created in the system, used for audit trails and chronological ordering |
 | `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | Current time | Timestamp of the most recent modification to any advertiser field, used for change tracking and relationship management |
 | `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | None | When populated, indicates the advertiser has been soft-deleted and should be excluded from active operations while retained for archival purposes |
@@ -283,22 +284,21 @@ The APIs are designed to support the operations of a television station, includi
 
 #### 4.1.1 Program Model
 - `title` must be unique across all active programs to prevent scheduling confusion
-- `duration_minutes` must be compatible with standard broadcast time slots (typically multiples of 15 or 30 minutes)
-- `schedule.repeat_indicator` must be set to true when the same program is scheduled within a 7-day period
-- If `schedule.status` is `LIVE`, then `schedule.start_time` and `schedule.end_time` fields become immutable
+- `duration_minutes` must be compatible with standard broadcast time slots, i.e., should be less than or equal to the difference between `schedule.start_time` and `schedule.end_time`.
+- If `schedule.status` is `LIVE`, then `schedule.start_time` and `schedule.end_time` fields become immutable. And these fields should be immutable when `schedule.status` is `COMPLETED` or `CANCELLED` as well.
 
 #### 4.1.2 Staff Model
 - `email` must be unique across all staff members
-- `email` domain must match the organization's approved domain list
 
 #### 4.1.3 Advertiser Model
 - `email` must be unique across all advertisers
-- When `advertisement_details.pricing_tier` is "PREMIUM", minimum `advertisement_details.budget` must be 50,000
+- When `advertisement_details.pricing_tier` is "PREMIUM", minimum `advertisement_details.budget` must be 50,000 USD
 - For each advertiser, total `program_placements` value cannot exceed `advertisement_details.budget`
 
 ### 4.2 State Machine Transitions
 
 #### 4.2.1 Program Schedule Status
+- `PLANNING` can transition to `PLANNED`
 - `PLANNED` can transition to `LIVE`
 - `PLANNED` can transition to `CANCELLED`
 - `LIVE` can transition to `COMPLETED`
@@ -330,36 +330,9 @@ The APIs are designed to support the operations of a television station, includi
 - Program time slot conflicts: If a program is scheduled to air during an already scheduled program, the new program will be scheduled for a different time slot.
 - Staff unavailability: Reassign roles and reschedule program
 
-### 4.5 Business Logic Triggers
+### 4.5 Deletion Behavior
 
-#### 4.5.1 Status Change Actions
-- When Program schedule.status changes to COMPLETED:
-  * Rating data is automatically updated.
-  * Staff program_history is automatically updated
-  * Advertising revenue is automatically calculated and recorded
-  * Program metadata.updated_at is automatically updated
-  
-- When Staff role changes:
-  * All current Program assignments are reviewed for compatibility
-
-#### 4.5.2 Automatic Calculations
-- Program broadcast duration is verified against schedule.start_time and schedule.end_time
-- Advertiser campaign remaining budget is recalculated after each advertisement placement
-- Program profitability is calculated by comparing production_cost against advertising revenue
-
-#### 4.5.3 Cascading Actions
-- When a Program is archived:
-  * All future broadcasts are automatically cancelled
-  * Associated staff are notified and assignments cleared
-  * Advertising slots are made unavailable
-  * Program content is moved to long-term storage
-  
-- When an Advertiser's contract_end_date passes:
-  * All future ad placements are cancelled
-
-### 4.6 Deletion Behavior
-
-#### 4.6.1 Program Model
+#### 4.5.1 Program Model
 
 **Prevention Criteria:**
 - Cannot delete a Program with schedule.status of LIVE
@@ -374,7 +347,7 @@ The APIs are designed to support the operations of a television station, includi
 - Program deleted_at timestamp is set to the current UTC time
 - Program ID is preserved to maintain referential integrity in historical records and data is moved to archival storage based on retention policies
 
-#### 4.6.2 Staff Model
+#### 4.5.2 Staff Model
 
 **Prevention Criteria:**
 - Cannot delete a Staff member assigned to any Program with schedule.status LIVE
@@ -387,7 +360,7 @@ The APIs are designed to support the operations of a television station, includi
 - Staff record is excluded from active assignment pools
 - Staff ID is preserved to maintain referential integrity in historical records and data is moved to archival storage based on retention policies
 
-#### 4.6.3 Advertiser Model
+#### 4.5.3 Advertiser Model
 
 **Prevention Criteria:**
 - Cannot delete an Advertiser with current date before contract_end_date
@@ -403,7 +376,7 @@ The APIs are designed to support the operations of a television station, includi
 - Advertiser deleted_at timestamp is set to the current UTC time
 - Advertiser ID is preserved to maintain referential integrity in historical records and data is moved to archival storage based on retention policies
 
-### 4.7 Deletion Audit Requirements
+### 4.6 Deletion Audit Requirements
 
 **Audit Trail:**
 
@@ -415,7 +388,6 @@ The APIs are designed to support the operations of a television station, includi
 **Retention Period:**
 
 - Deletion audit logs must be retained for a minimum of 7 years
-- Deletion of critical infrastructure components must be retained for 15 years
 - Audit logs cannot be deleted or modified once created
 
 ## 5. Television Station Management API Endpoints
@@ -428,17 +400,17 @@ The APIs are designed to support the operations of a television station, includi
 **Request Body Schema:**
 ```json
 {
-  "title": "string",
-  "genre": "DRAMA|COMEDY|NEWS|SPORTS|DOCUMENTARY|REALITY|CHILDREN|MUSIC|LIFESTYLE|OTHER",
-  "description": "string",
-  "duration_minutes": "decimal",
-  "production_cost": "decimal",
-  "schedule": {
-    "date": "YYYY-MM-DD",
-    "start_time": "HH:MM:SS",
-    "end_time": "HH:MM:SS",
-    "status": "PLANNED",
-    "repeat_indicator": false
+  "title": "string",                   // Required, Descriptive title
+  "genre": "DRAMA|COMEDY|NEWS|SPORTS|DOCUMENTARY|REALITY|CHILDREN|MUSIC|LIFESTYLE|OTHER",  // Required
+  "description": "string",             // Optional, Program description up to 5000 characters
+  "duration_minutes": "decimal",       // Required, Positive decimal representing duration
+  "production_cost": "decimal",        // Optional, Positive decimal representing cost in USD
+  "schedule": {                        // Required
+    "date": "date",                    // Required, Valid date for broadcast
+    "start_time": "time",              // Required, Start time in HH:MM:SS format
+    "end_time": "time",                // Required, End time in HH:MM:SS format
+    "status": "PLANNING|PLANNED|LIVE|COMPLETED|CANCELLED", // Required, Default: PLANNED
+    "repeat_indicator": "boolean"      // Optional, Default: false
   }
 }
 ```
@@ -449,7 +421,7 @@ The APIs are designed to support the operations of a television station, includi
   "program_id": "uuid",
   "title": "string",
   "metadata": {
-    "created_at": "timestamp"
+  "created_at": "timestamp"
   }
 }
 ```
@@ -502,6 +474,11 @@ The APIs are designed to support the operations of a television station, includi
       "id": "MISSING_ANCHOR_FOR_NEWS",
       "field": "staff_assignments",
       "message": "A NEWS program must have at least one ANCHOR assigned."
+    },
+    {
+      "id": "MISSING_PRODUCER_FOR_PLANNED_STATUS",
+      "field": "staff_assignments",
+      "message": "A program with PLANNED status must have at least one PRODUCER assigned."
     }
   ]
 }
@@ -523,20 +500,20 @@ The APIs are designed to support the operations of a television station, includi
 {
   "program_id": "uuid",
   "title": "string",
-  "genre": "DRAMA",
+  "genre": "string",
   "description": "string",
-  "duration_minutes": 60,
-  "production_cost": 75000,
+  "duration_minutes": "decimal",
+  "production_cost": "decimal",
   "schedule": {
-    "date": "YYYY-MM-DD",
-    "start_time": "HH:MM:SS",
-    "end_time": "HH:MM:SS",
-    "status": "PLANNED",
-    "repeat_indicator": false
+    "date": "date",
+    "start_time": "time",
+    "end_time": "time",
+    "status": "string",
+    "repeat_indicator": "boolean"
   },
   "ratings": {
-    "rating_value": 8.5,
-    "viewers_count": 15000
+    "rating_value": "decimal",
+    "viewers_count": "integer"
   },
   "staff_assignments": [
     { "staff_id": "uuid" }
@@ -544,8 +521,8 @@ The APIs are designed to support the operations of a television station, includi
   "advertising_slots": [
     {
       "advertiser_id": "uuid",
-      "slot_duration (minutes)": 15,
-      "price_paid": 2000
+      "slot_duration_minutes": "integer",
+      "price_paid": "decimal"
     }
   ],
   "metadata": {
@@ -579,17 +556,30 @@ The APIs are designed to support the operations of a television station, includi
 **Request Body Schema:**
 ```json
 {
-  "title": "string",
-  "description": "string",
-  "duration_minutes": "decimal",
-  "production_cost": "decimal",
-  "schedule": {
-    "date": "YYYY-MM-DD",
-    "start_time": "HH:MM:SS",
-    "end_time": "HH:MM:SS",
-    "status": "LIVE|CANCELLED|COMPLETED",
-    "repeat_indicator": true
-  }
+  "title": "string",                   // Optional
+  "genre": "DRAMA|COMEDY|NEWS|SPORTS|DOCUMENTARY|REALITY|CHILDREN|MUSIC|LIFESTYLE|OTHER", // Optional
+  "description": "string",             // Optional
+  "duration_minutes": "decimal",       // Optional
+  "production_cost": "decimal",        // Optional
+  "schedule": {                        // Optional
+    "date": "date",                    // Optional (immutable if status is LIVE)
+    "start_time": "time",              // Optional (immutable if status is LIVE)
+    "end_time": "time",                // Optional (immutable if status is LIVE)
+    "status": "PLANNING|PLANNED|LIVE|COMPLETED|CANCELLED", // Optional
+    "repeat_indicator": "boolean"      // Optional
+  },
+  "staff_assignments": [               // Optional
+    {
+      "staff_id": "uuid"               // Required if staff_assignments is provided
+    }
+  ],
+  "advertising_slots": [               // Optional
+    {
+      "advertiser_id": "uuid",         // Required if advertising_slots is provided
+      "slot_duration_minutes": "integer", // Required if advertising_slots is provided
+      "price_paid": "decimal"          // Required if advertising_slots is provided
+    }
+  ]
 }
 ```
 
@@ -676,7 +666,7 @@ The APIs are designed to support the operations of a television station, includi
 **Request Body Schema:**
 ```json
 {
-  "program_ids": ["uuid", "uuid"]
+  "program_ids": ["uuid", "uuid"]      // Required, Array of Program IDs to delete
 }
 ```
 **Response Codes:**:  
@@ -723,11 +713,16 @@ The APIs are designed to support the operations of a television station, includi
 **Request Body Schema:**
 ```json
 {
-  "first_name": "string",
-  "last_name": "string",
-  "email": "string",
-  "phone": "string",
-  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER"
+  "first_name": "string",              // Required, Staff's first name
+  "last_name": "string",               // Required, Staff's last name
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER", // Required
+  "email": "string",                   // Required, Valid professional email
+  "phone": "string"                   // Optional, Contact number in E.164 format
+  "program_history": [                // Optional, Array of program IDs
+    {
+      "program_id": "uuid"            // Required if program_history is provided
+    }
+  ]
 }
 ```
 
@@ -737,7 +732,7 @@ The APIs are designed to support the operations of a television station, includi
   "staff_id": "uuid",
   "email": "string",
   "metadata": {
-  "created_at": "timestamp"
+    "created_at": "timestamp"
   }
 }
 ```
@@ -798,7 +793,12 @@ The APIs are designed to support the operations of a television station, includi
   "last_name": "string",
   "email": "string",
   "phone": "string",
-  "role": "EDITOR",
+  "role": "string",
+  "program_history": [
+    {
+      "program_id": "uuid"
+    }
+  ],
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -830,11 +830,11 @@ The APIs are designed to support the operations of a television station, includi
 **Request Body Schema:**
 ```json
 {
-  "first_name": "string",
-  "last_name": "string",
-  "email": "string",
-  "phone": "string",
-  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER"
+  "first_name": "string",              // Optional
+  "last_name": "string",               // Optional
+  "email": "string",                   // Optional, must be unique
+  "phone": "string",                   // Optional
+  "role": "PRODUCER|DIRECTOR|EDITOR|ANCHOR|MANAGER" // Optional
 }
 ```
 
@@ -918,7 +918,7 @@ The APIs are designed to support the operations of a television station, includi
 **Request Body Schema:**
 ```json
 {
-  "staff_ids": ["uuid", "uuid"]
+  "staff_ids": ["uuid", "uuid"]        // Required, Array of Staff IDs to delete
 }
 ```
 **Success Response:**
@@ -962,15 +962,22 @@ The APIs are designed to support the operations of a television station, includi
 **Request Body Schema:**
 ```json
 {
-  "name": "string",
-  "email": "string",
-  "phone": "string",
-  "contract_end_date": "YYYY-MM-DD",
-  "advertisement_details": {
-    "target_time_slot": "HH:MM:SS",
-    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
-    "budget": "decimal"
-  }
+  "name": "string",                     // Required, Full name of advertiser
+  "email": "string",                    // Required, Valid email format
+  "phone": "string",                    // Required, Contact phone in E.164 format
+  "contract_end_date": "date",          // Optional, End date of advertising contract
+  "advertisement_details": {            // Optional
+    "target_time_slot": "time",         // Optional, Preferred broadcast time
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL", // Optional, Default: STANDARD
+    "budget": "decimal"                 // Optional, Required when pricing_tier is "PREMIUM"
+  },
+  "program_placements": [               // Optional
+    {
+      "program_id": "uuid",             // Required if program_placements is provided
+      "slot_count": "integer",          // Required if program_placements is provided
+      "total_value": "decimal"          // Required if program_placements is provided
+    }
+  ]
 }
 ```
 
@@ -1027,7 +1034,7 @@ The APIs are designed to support the operations of a television station, includi
     {
       "id": "INSUFFICIENT_BUDGET_FOR_PREMIUM",
       "field": "advertisement_details.budget",
-      "message": "Minimum budget for PREMIUM tier must be 50,000."
+      "message": "Minimum budget for PREMIUM tier must be 50,000 USD."
     },
     {
       "id": "INVALID_TIME_SLOT",
@@ -1055,17 +1062,17 @@ The APIs are designed to support the operations of a television station, includi
   "name": "string",
   "email": "string",
   "phone": "string",
-  "contract_end_date": "YYYY-MM-DD",
+  "contract_end_date": "date",
   "advertisement_details": {
-    "target_time_slot": "HH:MM:SS",
-    "pricing_tier": "STANDARD",
-    "budget": 30000
+    "target_time_slot": "time",
+    "pricing_tier": "string",
+    "budget": "decimal"
   },
   "program_placements": [
     {
-  "program_id": "uuid",
-      "slot_count": 2,
-      "total_value": 4000
+      "program_id": "uuid",
+      "slot_count": "integer",
+      "total_value": "decimal"
     }
   ],
   "metadata": {
@@ -1099,15 +1106,22 @@ The APIs are designed to support the operations of a television station, includi
 **Request Body Schema:**
 ```json
 {
-  "name": "string",
-  "email": "string",
-  "phone": "string",
-  "contract_end_date": "YYYY-MM-DD",
-  "advertisement_details": {
-    "target_time_slot": "HH:MM:SS",
-    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL",
-    "budget": "decimal"
-  }
+  "name": "string",                     // Optional
+  "email": "string",                    // Optional
+  "phone": "string",                    // Optional
+  "contract_end_date": "date",          // Optional
+  "advertisement_details": {            // Optional
+    "target_time_slot": "time",         // Optional
+    "pricing_tier": "PREMIUM|STANDARD|ECONOMY|PROMOTIONAL", // Optional
+    "budget": "decimal"                 // Optional, Required when pricing_tier is "PREMIUM"
+  },
+  "program_placements": [               // Optional
+    {
+      "program_id": "uuid",             // Required if program_placements is provided
+      "slot_count": "integer",          // Required if program_placements is provided
+      "total_value": "decimal"          // Required if program_placements is provided
+    }
+  ]
 }
 ```
 
@@ -1146,7 +1160,7 @@ The APIs are designed to support the operations of a television station, includi
     {
       "id": "BUDGET_BELOW_MINIMUM",
       "field": "advertisement_details.budget",
-      "message": "Budget for PREMIUM tier must be at least 50,000."
+      "message": "Budget for PREMIUM tier must be at least 50,000. is USD"
     }
   ]
 }
@@ -1218,6 +1232,53 @@ The APIs are designed to support the operations of a television station, includi
 }
 ```
 
+#### 5.3.5 Bulk Delete Advertisers
+**URL:** DELETE /api/v1/advertisers/bulk
+
+**Request Body Schema:**
+```json
+{
+  "advertiser_ids": ["uuid", "uuid"]    // Required, Array of Advertiser IDs to delete
+}
+```
+
+**Success Response:**
+- **200 OK**
+```json
+{
+  "successful_deletions": ["uuid", "uuid"],
+  "failed_deletions": [
+    {
+      "id": "uuid",
+      "reason": "ADVERTISER_HAS_ACTIVE_CONTRACT"
+    },
+    {
+      "id": "uuid",
+      "reason": "ADVERTISER_NOT_FOUND"
+    }
+  ],
+  "deleted_count": 2,
+  "failed_count": 2
+}
+```
+
+**Possible Error Responses:**
+
+- **400 Bad Request:**
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "message": "Advertiser IDs are required to delete advertisers"
+}
+```
+- **500 Internal Server Error:**
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request."
+}
+```
+
 ## 6. Television Station Management Workflow Examples
 
 ### 6.1 Program Scheduling and Broadcast Workflow
@@ -1246,7 +1307,7 @@ Content-Type: application/json
     "date": "2024-06-15",
     "start_time": "19:00:00",
     "end_time": "20:00:00",
-    "status": "PLANNED",
+    "status": "PLANNING",
     "repeat_indicator": false
   }
 }
@@ -1271,6 +1332,9 @@ PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
 Content-Type: application/json
 
 {
+  "schedule": {
+    "status": "PLANNED"
+  },
   "staff_assignments": [
     {"staff_id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"}, // PRODUCER
     {"staff_id": "b2c3d4e5-f6a5-4b8c-7d9e-0f1a2b3c4d5e"}  // ANCHOR
@@ -1282,6 +1346,7 @@ Content-Type: application/json
 ```json
 {
   "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Evening News",
   "metadata": {
     "updated_at": "2024-05-20T14:35:22.456Z"
   }
@@ -1311,12 +1376,12 @@ Content-Type: application/json
   "advertising_slots": [
     {
       "advertiser_id": "d4e5f6a5-b8c7-4d9e-0f1a-2b3c4d5e6f7a",
-      "slot_duration (minutes)": 2,
+      "slot_duration_minutes": 2,
       "price_paid": 5000
     },
     {
       "advertiser_id": "e5f6a5b8-c7d9-4e0f-1a2b-3c4d5e6f7a8b",
-      "slot_duration (minutes)": 1,
+      "slot_duration_minutes": 1,
       "price_paid": 2500
     }
   ]
@@ -1327,6 +1392,7 @@ Content-Type: application/json
 ```json
 {
   "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Evening News",
   "metadata": {
     "updated_at": "2024-05-20T14:40:15.789Z"
   }
@@ -1361,6 +1427,7 @@ Content-Type: application/json
 ```json
 {
   "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Evening News",
   "metadata": {
     "updated_at": "2024-06-15T19:00:05.123Z"
   }
@@ -1401,6 +1468,7 @@ Content-Type: application/json
 ```json
 {
   "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Evening News",
   "metadata": {
     "updated_at": "2024-06-15T20:00:15.456Z"
   }
@@ -1447,7 +1515,7 @@ Content-Type: application/json
 #### Step 2: Allocate Advertising Slots to Programs
 
 **Request:**
-```
+```json
 PATCH /api/v1/programs/f47ac10b-58cc-4372-a567-0e02b2c3d479
 Content-Type: application/json
 
@@ -1455,7 +1523,7 @@ Content-Type: application/json
   "advertising_slots": [
     {
       "advertiser_id": "d4e5f6a5-b8c7-4d9e-0f1a-2b3c4d5e6f7a",
-      "slot_duration (minutes)": 2,
+      "slot_duration_minutes": 2,
       "price_paid": 5000
     }
   ]
@@ -1466,6 +1534,7 @@ Content-Type: application/json
 ```json
 {
   "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Evening News",
   "metadata": {
     "updated_at": "2024-05-15T10:20:45.789Z"
   }
@@ -1541,6 +1610,7 @@ Content-Type: application/json
 ```json
 {
   "program_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Evening News",
   "metadata": {
     "updated_at": "2024-05-10T09:35:45.789Z"
   }
