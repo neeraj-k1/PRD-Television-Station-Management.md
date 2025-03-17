@@ -28,6 +28,7 @@ The API covers set design approval workflows, prop management with status tracki
 - **Global URL Pattern**:
   - Parent Resources: `/{resource-type}`
   - Child/Nested Resources: `/{parent-resource}/{parent-id}/{child-resource}`
+  - Special Operations: `/{resource-type}/{operation}`
 
 ### 2.3 Timestamp Management
 - **Timestamp Type**: Server-managed
@@ -237,6 +238,7 @@ The API covers set design approval workflows, prop management with status tracki
 #### 4.2.1 Set Status Transitions
 - From `PLANNED` to `APPROVED`
 - From `APPROVED` to `COMPLETED`
+- From `APPROVED` to `PLANNED`
 - Once `COMPLETED`, the status cannot be changed.
 
 #### 4.2.2 Location Availability Transitions
@@ -995,7 +997,18 @@ The API covers set design approval workflows, prop management with status tracki
 ```json
 {
   "error_id": "UNPROCESSABLE_ENTITY",
-  "message": "prop type cannot be modified since the set is in completed status."
+  "errors": [
+    {
+      "id": "INVALID_OPERATION_ON_COMPLETED_SET",
+      "field": "type",
+      "message": "prop type cannot be modified since the set is in `completed` status."
+    },
+    {
+      "id": "INVALID_OPERATION_ON_APPROVED_PROP",
+      "field": "type",
+      "message": "prop type with `approval_status` `APPROVED` cannot be modified."
+    }
+  ]
 }
 ```
 
@@ -1109,7 +1122,6 @@ POST /api/v1/sets
 Content-Type: application/json
 
 {
-  "set_id": "s1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
   "name": "Downtown Café Set",
   "status": "PLANNED",
   "description": "Modern café interior with seating for 20"
@@ -1215,7 +1227,6 @@ POST /api/v1/props
 Content-Type: application/json
 
 {
-  "prop_id": "p3f4g5h6-7i8j-9k0l-1m2n-3o4p5q6r7s8t",
   "set_id": "s1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
   "name": "Vintage Espresso Machine",
   "type": "DECOR",
@@ -1242,7 +1253,6 @@ POST /api/v1/props
 Content-Type: application/json
 
 {
-  "prop_id": "p9t8s7r6-5q4p-3o2n-1m0l-9k8j7i6h5g4f",
   "set_id": "s1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
   "name": "Barista Counter",
   "type": "FURNITURE",
