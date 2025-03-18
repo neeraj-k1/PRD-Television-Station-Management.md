@@ -155,14 +155,14 @@ This system will provide comprehensive functionality for aircraft design managem
 | `design_id` | uuid | Yes | Immutable unique identifier | Never | None | Primary identifier for the aircraft design that remains consistent throughout its lifecycle, used in all API operations and cross-references from components and tests |
 | `name` | string | Yes | Length: 1-100 | Mutable | None | Official name of the aircraft design that will appear in technical documentation, engineering reports, and project planning materials |
 | `status` | enum | Yes | [`DRAFT`, `APPROVED`, `REJECTED`] | Mutable | `DRAFT` | Current state of the design in the workflow that determines its visibility, modifiability, and readiness for production consideration |
-| `version` | string | No | Length: 1-50 | Mutable | None | Version identifier that tracks design iterations and evolution, critical for maintaining design history and comparing changes between iterations. This is automatically incremented when any field is changed. |
+| `version` | string | No | Length: 1-50 | Never | None | Version identifier that tracks design iterations and evolution, critical for maintaining design history and comparing changes between iterations. This is automatically incremented when any field is changed. |
 | `description` | string | No | Length: 1-2000 | Mutable | None | Detailed explanation of the aircraft's purpose, key features, and design philosophy, used for contextual understanding and documentation purposes |
-| `specifications.wingspan` | decimal | Yes | Min: 0 | Mutable | None | Distance from wingtip to wingtip in meters, a critical aerodynamic parameter that affects lift, stability, and airport compatibility |
-| `specifications.length` | decimal | Yes | Min: 0 | Mutable | None | Total length of the aircraft from nose to tail in meters, important for determining storage requirements and runway compatibility |
-| `specifications.weight` | decimal | Yes | Min: 0 | Mutable | None | Empty weight of the aircraft in kilograms, a fundamental parameter affecting performance, fuel consumption, and payload capacity |
+| `specifications.wingspan` | decimal | Yes | Must be greater than 0 | Mutable | None | Distance from wingtip to wingtip in meters, a critical aerodynamic parameter that affects lift, stability, and airport compatibility |
+| `specifications.length` | decimal | Yes | Must be greater than 0 | Mutable | None | Total length of the aircraft from nose to tail in meters, important for determining storage requirements and runway compatibility |
+| `specifications.weight` | decimal | Yes | Must be greater than 0 | Mutable | None | Empty weight of the aircraft in kilograms, a fundamental parameter affecting performance, fuel consumption, and payload capacity |
 | `specifications.engine_count` | integer | Yes | Range: 0-10 | Mutable | 1 | Number of engines on the aircraft, determines thrust capacity, redundancy, and maintenance requirements |
-| `specifications.unit_of_measure_weight` | string | Yes | Length: 1-500 | Mutable | None | Unit of measure for the weight, used for storage, transportation, and assembly planning |
-| `specifications.unit_of_measure_dimensions` | string | Yes | Length: 1-500 | Mutable | None | Unit of measure for the dimensions, used for storage, transportation, and assembly planning |
+| `specifications.unit_of_measure_weight` | string | Yes | Length: 0-500 | Mutable | None | Unit of measure for the weight, used for storage, transportation, and assembly planning |
+| `specifications.unit_of_measure_dimensions` | string | Yes | Length: 0-500 | Mutable | None | Unit of measure for the dimensions, used for storage, transportation, and assembly planning |
 | `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Never | Current time | Precise moment when the design record was first created, used for audit trails and chronological ordering in design evolution |
 | `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Mutable | Current time | Timestamp of the most recent modification to any design field, used for tracking changes and design history |
 | `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | Null | When populated, indicates the design has been soft-deleted and should be excluded from active development while maintaining historical record |
@@ -191,11 +191,11 @@ This system will provide comprehensive functionality for aircraft design managem
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|-------------|
 | `component_id` | uuid | Yes | Immutable unique identifier | Never | None | Primary identifier for the component that remains consistent throughout its lifecycle, used in all API operations and cross-references |
-| `design_id` | uuid | Yes | Must reference existing design | Never | None | Reference to the parent aircraft design this component belongs to, establishing a many-to-onehierarchical relationship. Relationship Type: Many-to-One (Component to Design) |
+| `design_id` | uuid | Yes | Must reference existing design | Never | None | Reference to the parent aircraft design this component belongs to, establishing a many-to-one hierarchical relationship. Relationship Type: Many-to-One (Component to Design) |
 | `name` | string | Yes | Length: 1-100 | Mutable | None | Descriptive name of the component used in technical documentation, parts catalogs, and assembly instructions |
 | `component_type` | enum | Yes | [`STRUCTURAL`, `ELECTRICAL`, `HYDRAULIC`, `AVIONICS`, `OTHER`] | Mutable | `STRUCTURAL` | Classification of the component that determines its function, integration requirements, and relevant engineering standards |
 | `specifications.material` | string | Yes | Length: 1-500 | Mutable | None | Primary material composition of the component, critical for weight calculations, stress analysis, and manufacturing planning |
-| `specifications.weight` | decimal | Yes | Min: 0 | Mutable | None | Weight of component in kilograms, important for overall aircraft weight calculations, balance determination, and performance analysis |
+| `specifications.weight` | decimal | Yes | Must be greater than 0 | Mutable | None | Weight of component in kilograms, important for overall aircraft weight calculations, balance determination, and performance analysis |
 | `specifications.unit_of_measure_weight` | string | Yes | Length: 1-500 | Mutable | None | Unit of measure for the weight, used for storage, transportation, and assembly planning |
 | `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Never | Current time | Precise moment when the component record was first created, used for audit trails and component development tracking |
 | `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Mutable | Current time | Timestamp of the most recent modification to any component field, used for tracking component revisions and change history |
@@ -1092,7 +1092,7 @@ This system will provide comprehensive functionality for aircraft design managem
 **Request Body Schema:**
 ```json
 {
-  "status": "PLANNED|COMPLETED|FAILED", // Optional - Updated test status
+  "status": "PLANNED|COMPLETED", // Optional - Updated test status
   "test_type": "AERODYNAMIC|STRUCTURAL|SYSTEMS|OTHER", // Optional - Updated test type
   "results": { // Optional object
     "outcome": "PASS|FAIL", // Required if status is COMPLETED - Test outcome
@@ -1131,11 +1131,6 @@ This system will provide comprehensive functionality for aircraft design managem
       "id": "MISSING_OUTCOME",
       "field": "results.outcome",
       "message": "Outcome is required when status is COMPLETED."
-    },
-    {
-      "id": "MISSING_DESIGN_ID",
-      "field": "design_id",
-      "message": "Design ID is required."
     },
     {
       "id": "INVALID_TEST_TYPE",
