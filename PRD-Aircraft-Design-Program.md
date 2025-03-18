@@ -3,7 +3,7 @@
 ## 1. Introduction
 
 ### 1.1 Purpose
-To create a streamlined aircraft design management system that allows engineers to efficiently create, track, and iterate on aircraft designs while providing essential testing capabilities and component management to support the full aircraft design lifecycle.
+To create a comprehensive REST API specification for an aircraft design management system that enables engineers to efficiently create, track aircraft designs through standardized HTTP endpoints. The API will provide structured interfaces for design creation and versioning, component tracking with material specifications, and critical testing capabilities to validate design performance and safety requirements. This specification defines the complete contract between applications and the aircraft design management system, ensuring consistent and reliable interactions across all design lifecycle stages.
 
 ### 1.2 Scope
 This system will provide comprehensive functionality for aircraft design management including design creation and versioning, component tracking with material specifications, and critical testing capabilities to validate design performance and safety requirements.
@@ -109,16 +109,16 @@ This system will provide comprehensive functionality for aircraft design managem
 - Maintain consistency across all endpoints
 
 ### 2.5 Field Validation Principles
-- **String Fields**:
+#### 2.5.1 String Fields
   - Length constraints explicitly defined
   - Trimmed of leading/trailing whitespaces
   - Cannot be empty unless explicitly allowed
 
-- **Numeric Fields**:
+#### 2.5.2 Numeric Fields
   - Precise range constraints
   - Non-negative unless explicitly specified
 
-- **Enum Fields**:
+#### 2.5.3 Enum Fields
   - Strict matching against predefined values
   - Case-sensitive matching
   - No default values unless specified
@@ -155,7 +155,7 @@ This system will provide comprehensive functionality for aircraft design managem
 | `design_id` | uuid | Yes | Immutable unique identifier | Never | None | Primary identifier for the aircraft design that remains consistent throughout its lifecycle, used in all API operations and cross-references from components and tests |
 | `name` | string | Yes | Length: 1-100 | Mutable | None | Official name of the aircraft design that will appear in technical documentation, engineering reports, and project planning materials |
 | `status` | enum | Yes | [`DRAFT`, `APPROVED`, `REJECTED`] | Mutable | `DRAFT` | Current state of the design in the workflow that determines its visibility, modifiability, and readiness for production consideration |
-| `version` | string | Yes | Length: 1-50 | Mutable | None | Version identifier that tracks design iterations and evolution, critical for maintaining design history and comparing changes between iterations |
+| `version` | string | No | Length: 1-50 | Mutable | None | Version identifier that tracks design iterations and evolution, critical for maintaining design history and comparing changes between iterations. This is automatically incremented when any field is changed. |
 | `description` | string | No | Length: 1-2000 | Mutable | None | Detailed explanation of the aircraft's purpose, key features, and design philosophy, used for contextual understanding and documentation purposes |
 | `specifications.wingspan` | decimal | Yes | Min: 0 | Mutable | None | Distance from wingtip to wingtip in meters, a critical aerodynamic parameter that affects lift, stability, and airport compatibility |
 | `specifications.length` | decimal | Yes | Min: 0 | Mutable | None | Total length of the aircraft from nose to tail in meters, important for determining storage requirements and runway compatibility |
@@ -191,7 +191,7 @@ This system will provide comprehensive functionality for aircraft design managem
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|-------------|
 | `component_id` | uuid | Yes | Immutable unique identifier | Never | None | Primary identifier for the component that remains consistent throughout its lifecycle, used in all API operations and cross-references |
-| `design_id` | uuid | Yes | Must reference existing design | Never | None | Reference to the parent aircraft design this component belongs to, establishing the hierarchical relationship between designs and their components. Relationship: Design |
+| `design_id` | uuid | Yes | Must reference existing design | Never | None | Reference to the parent aircraft design this component belongs to, establishing a many-to-onehierarchical relationship. Relationship Type: Many-to-One (Component to Design) |
 | `name` | string | Yes | Length: 1-100 | Mutable | None | Descriptive name of the component used in technical documentation, parts catalogs, and assembly instructions |
 | `component_type` | enum | Yes | [`STRUCTURAL`, `ELECTRICAL`, `HYDRAULIC`, `AVIONICS`, `OTHER`] | Mutable | `STRUCTURAL` | Classification of the component that determines its function, integration requirements, and relevant engineering standards |
 | `specifications.material` | string | Yes | Length: 1-500 | Mutable | None | Primary material composition of the component, critical for weight calculations, stress analysis, and manufacturing planning |
@@ -225,7 +225,7 @@ This system will provide comprehensive functionality for aircraft design managem
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|-------------|
 | `test_id` | uuid | Yes | Immutable unique identifier | Never | None | Primary identifier for the test that remains consistent throughout its lifecycle, used in all API operations and cross-references.|
-| `design_id` | uuid | Yes | Must reference existing design | Never | None | Reference to the aircraft design being tested, establishing traceability between test results and specific design versions. Relationship: Design |
+| `design_id` | uuid | Yes | Must reference existing design | Never | None | Reference to the aircraft design being tested, establishing a many-to-one hierarchical relationship. Relationship Type: Many-to-One (Test to Design) |
 | `status` | enum | Yes | [`PLANNED`, `COMPLETED`] | Mutable | `PLANNED` | Current state of the test in the workflow that determines whether it is scheduled, successfully finished, or terminated due to issues |
 | `test_type` | enum | Yes | [`AERODYNAMIC`, `STRUCTURAL`, `SYSTEMS`, `OTHER`] | Mutable | `AERODYNAMIC` | Classification of the test methodology and focus area, determining required equipment, expertise, and validation criteria |
 | `results.outcome` | enum | No | [`PASS`, `FAIL`] | Mutable | None | Final determination of test success or failure, critical for design approval decisions |
@@ -235,35 +235,19 @@ This system will provide comprehensive functionality for aircraft design managem
 | `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | Null | When populated, indicates the test has been soft-deleted and should be excluded from active consideration while maintaining historical record |
 
 
-#### Field Specifications
-
-| Field | Type | Required | Constraints | Mutability | Default | Relationships |
-|-------|------|----------|-------------|------------|---------|--------------|
-| `component_id` | uuid | Yes | Immutable unique identifier | Never | None | None |
-| `design_id` | uuid | Yes | Must reference existing design | Never | None | None |
-| `name` | string | Yes | Length: 1-100 | Mutable | None | None |
-| `component_type` | enum | Yes | [STRUCTURAL, ELECTRICAL, HYDRAULIC, AVIONICS, OTHER] | Mutable | STRUCTURAL | None |
-| `specifications.material` | string | Yes | Length: 1-500 | Mutable | None | None |
-| `specifications.weight` | decimal | Yes | Min: 0 | Mutable | None | None |
-| `specifications.dimensions` | string | Yes | Length: 1-500 | Mutable | None | None |
-| `metadata.created_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Never | Current time | None |
-| `metadata.updated_at` | timestamp | Yes | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Mutable | Current time | None |
-| `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | Null | None |
-
-
 ## 4. Complex Business Rules
 
 ### 4.1 Conditional Field Requirements
 
-#### Design Model
-- `version` must be incremented when any specification is changed
+#### 4.1.1 Design Model
+- `version` must be automatically incremented when any field is changed.
 - `description` becomes required when transitioning from "DRAFT" to "APPROVED"
 - `specifications.wingspan`, `specifications.length` must be provided in same unit of measure as `specifications.unit_of_measure_dimensions`.
 
-#### Component Model
+#### 4.1.2 Component Model
 - Components with duplicate `name` values within the same `design_id` are allowed only when in different `component_type` categories
 
-#### Test Model
+#### 4.1.3 Test Model
 - `results.outcome` required only when `status` is "COMPLETED".
 - `test_type` cannot be modified once the test `status` is "COMPLETED".
 
@@ -284,7 +268,7 @@ This system will provide comprehensive functionality for aircraft design managem
 #### 4.3.1 Design-Component Validation
 - Components can only reference designs that are not soft-deleted (no `metadata.deleted_at` value)
 - When a design's `status` changes to "APPROVED", any modification to its associated components is prohibited
-- Sum of all component weights must not exceed the design's `specifications.weight`, keeping in mind that the unit of measure for the weight may be different from the unit of measure for the dimensions.
+- Sum of all component weights must not exceed the design's `specifications.weight`, keeping in mind that the unit of measure for the weight may be different from the unit of measure of component weight.
 
 #### 4.3.2 Design-Test Validation
 - Tests can only reference designs that are not soft-deleted (no `metadata.deleted_at` value)
@@ -295,7 +279,7 @@ This system will provide comprehensive functionality for aircraft design managem
 #### 4.4.1 Design Approval Process
 1. **Initial Creation**
    - Create design record with `status` "DRAFT"
-   - Define all required attributes including `name`, `version`, and specifications
+   - Define all required attributes including `name` and `specifications`
 
 2. **Component Definition**
    - Add all necessary components to the design
@@ -346,20 +330,19 @@ This system will provide comprehensive functionality for aircraft design managem
 
 ### 4.6 Deletion Audit Requirements
 
-**Audit Trail:**
+#### 4.6.1 Audit Trail
 
 - All deletion attempts (successful or prevented) must be logged with:
   - Timestamp of deletion attempt (ISO 8601 format)
   - User or system identifier that initiated the deletion
   - Resource ID and type
 
-**Retention Period:**
+#### 4.6.2 Retention Period
 
 - Deletion audit logs must be retained for a minimum of 7 years
 - Deletion of critical infrastructure components must be retained for 15 years
-- Audit logs cannot be deleted or modified once created
 
-**Regulatory Compliance:**
+#### 4.6.3 Regulatory Compliance
 
 - Deletion of certain resources may require regulatory notification
 - Critical infrastructure deletions may require additional approval workflow
@@ -500,7 +483,7 @@ This system will provide comprehensive functionality for aircraft design managem
 {
   "name": "string", // Optional - Updated name of the aircraft design
   "description": "string", // Optional - Updated description
-  "status": "DRAFT|APPROVED|REJECTED", // Optional - Updated status
+  "status": "DRAFT|REJECTED|APPROVED", // Optional - Updated status
   "specifications": { // Optional object
     "wingspan": "decimal", // Optional - Updated wingspan
     "length": "decimal", // Optional - Updated length
@@ -569,7 +552,18 @@ This system will provide comprehensive functionality for aircraft design managem
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot approve design with tests still in PLANNED status."
+  "errors": [
+    {
+      "id": "APPROVED_STATUS_CHANGE",
+      "field": "status",
+      "message": "Approved design status cannot be changed."
+    },
+    {
+      "id": "TEST_STATUS_CONFLICT",
+      "field": "status",
+      "message": "Cannot approve design with tests still in PLANNED status."
+    }
+  ]
 }
 ```
 
@@ -1495,7 +1489,7 @@ PATCH /api/v1/designs/d8f7a3c1-b5e2-4e7f-9a8b-c6d5e4f3a2b1
   "design_id": "d8f7a3c1-b5e2-4e7f-9a8b-c6d5e4f3a2b1",
   "name": "Sky Cruiser 700",
   "status": "APPROVED",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Medium-range commercial aircraft with high fuel efficiency",
   "specifications": {
     "wingspan": 35.8,
