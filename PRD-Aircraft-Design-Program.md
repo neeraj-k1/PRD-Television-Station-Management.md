@@ -377,7 +377,7 @@ This system will provide comprehensive functionality for aircraft design managem
 {
   "name": "string", // Required - Official name of the aircraft design
   "description": "string", // Optional - Detailed explanation of the aircraft
-  "status": "DRAFT", // Required - Initial status of the design
+  "status": "DRAFT", // Optional, Default: DRAFT
   "specifications": { // Required object
     "wingspan": "decimal", // Required - Distance from wingtip to wingtip
     "length": "decimal", // Required - Total length of the aircraft
@@ -985,7 +985,7 @@ This system will provide comprehensive functionality for aircraft design managem
 {
   "design_id": "uuid", // Required - Reference to parent design
   "test_type": "AERODYNAMIC|STRUCTURAL|SYSTEMS|OTHER", // Required - Classification of the test
-  "status": "PLANNED" // Required - Initial test status
+  "status": "PLANNED" // Required, default: PLANNED
 }
 ```
 
