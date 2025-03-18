@@ -110,16 +110,16 @@ This system will provide functionality for managing the complete lifecycle of of
 - Maintain consistency across all endpoints
 
 ### 2.5 Field Validation Principles
-- **String Fields**:
+#### 2.5.1 String Fields:
   - Length constraints explicitly defined
   - Trimmed of leading/trailing whitespaces
   - Cannot be empty unless explicitly allowed
 
-- **Numeric Fields**:
+#### 2.5.2 Numeric Fields:
   - Precise range constraints
   - Non-negative unless explicitly specified
 
-- **Enum Fields**:
+#### 2.5.3 Enum Fields:
   - Strict matching against predefined values
   - Case-sensitive matching
   - No default values unless specified
@@ -127,6 +127,8 @@ This system will provide functionality for managing the complete lifecycle of of
 ## 3. Comprehensive Resource Models
 
 ### 3.1 Wind Farm Model
+
+#### 3.1.1 JSON Schema
 ```json
 {
   "farm_id": "uuid",
@@ -147,14 +149,15 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
-#### Field Specifications
+#### 3.1.2 Field Specifications
+
 | Field Name | Type | Required | Mutable | Description | Constraints | Default |
 |-------|------|----------|---------|-------------|------------|---------|
 | `farm_id` | uuid | Yes | Never | Primary identifier for the wind farm that remains consistent throughout its lifecycle, used in all API operations and cross-references from turbines and maintenance records | Immutable unique identifier | None |
 | `name` | string | Yes | Mutable | Official name of the wind farm used in documentation, regulatory filings, and grid connection agreements that will appear on all operational reports and compliance documents | Length: 1-100 | None |
 | `status` | enum | Yes | Mutable | Current state of the wind farm that determines its development stage, operational capabilities, and regulatory requirements, affecting energy production forecasts and maintenance scheduling | [`PLANNED`, `OPERATIONAL`, `DECOMMISSIONED`] | `PLANNED` |
-| `capacity` | decimal | Yes | Mutable | Total energy generation capacity of the wind farm in megawatts (MW), critical for production forecasting, grid integration planning, and revenue projections | Min: 0 | None |
-| `turbine_count` | integer | Yes | Mutable | Number of wind turbines deployed or planned for deployment in the farm, essential for layout planning, maintenance scheduling, and resource allocation | Min: 1 | None |
+| `capacity` | decimal | Yes | Mutable | Total energy generation capacity of the wind farm in megawatts (MW), critical for production forecasting, grid integration planning, and revenue projections | Must be greater than 0 | None |
+| `turbine_count` | integer | Yes | Mutable | Number of wind turbines deployed or planned for deployment in the farm, essential for layout planning, maintenance scheduling, and resource allocation | Min: 0 | None |
 | `location_latitude` | decimal | Yes | Mutable | Latitude coordinate of the farm's center point, essential for navigation, territorial jurisdiction determination, and weather forecasting | Range: -90 to 90 | None |
 | `location_longitude` | decimal | Yes | Mutable | Longitude coordinate of the farm's center point, essential for navigation, territorial jurisdiction determination, and weather forecasting | Range: -180 to 180 | None |
 | `water_depth` | decimal | Yes | Mutable | Average depth of water at the site in meters, determining foundation type, installation methods, and maintenance vessel requirements | Min: 0 | None |
@@ -165,6 +168,8 @@ This system will provide functionality for managing the complete lifecycle of of
 | `metadata.deleted_at` | timestamp | No | Mutable | When populated, indicates the wind farm has been soft-deleted and should be excluded from active operations while maintaining historical record for regulatory compliance | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Null |
 
 ### 3.2 Turbine Model
+
+#### 3.2.1 JSON Schema
 ```json
 {
   "turbine_id": "uuid",
@@ -186,7 +191,7 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
-#### Field Specifications
+#### 3.2.2 Field Specifications
 | Field Name | Type | Required | Mutable | Description | Constraints | Default |
 |-------|------|----------|---------|-------------|------------|---------|
 | `turbine_id` | uuid | Yes | Never | Primary identifier for the turbine that remains consistent throughout its lifecycle, used in all API operations, maintenance tracking, and performance analysis | Immutable unique identifier | None |
@@ -194,10 +199,10 @@ This system will provide functionality for managing the complete lifecycle of of
 | `name` | string | Yes | Mutable | Identifying name or number of the turbine within the wind farm, used in technical documentation, maintenance records, and operational communications | Length: 1-100 | None |
 | `model` | string | Yes | Mutable | Manufacturer and model designation of the turbine, determining its specifications, warranty terms, and maintenance requirements | Length: 1-100 | None |
 | `status` | enum | Yes | Mutable | Current operational state of the turbine that determines its availability for energy production, maintenance needs, and inclusion in farm output calculations | [`INSTALLED`, `OPERATIONAL`, `MAINTENANCE`, `INACTIVE`] | `INSTALLED` |
-| `capacity` | decimal | Yes | Mutable | Maximum power generation capacity of the turbine in megawatts (MW), essential for production planning, load balancing, and individual turbine performance assessment | Min: 0 | None |
-| `hub_height` | decimal | Yes | Mutable | Height of the turbine hub above sea level in meters, affecting wind capture efficiency, structural requirements, and navigation clearance considerations | Min: 0 | None |
-| `rotor_diameter` | decimal | Yes | Mutable | Diameter of the turbine rotor in meters, determining the swept area, potential energy capture, and minimum spacing requirements between turbines | Min: 0 | None |
-| `installation_date` | date | No | Mutable | Date when the turbine was installed at the offshore location, marking the start of its operational lifecycle, warranty period, and maintenance schedule | Must be a valid date with format YYYY-MM-DD | None |
+| `capacity` | decimal | Yes | Mutable | Maximum power generation capacity of the turbine in megawatts (MW), essential for production planning, load balancing, and individual turbine performance assessment | Must be greater than 0 | None |
+| `hub_height` | decimal | Yes | Mutable | Height of the turbine hub above sea level in meters, affecting wind capture efficiency, structural requirements, and navigation clearance considerations | Must be greater than 0 | None |
+| `rotor_diameter` | decimal | Yes | Mutable | Diameter of the turbine rotor in meters, determining the swept area, potential energy capture, and minimum spacing requirements between turbines | Must be greater than 0 | None |
+| `installation_date` | date | Yes | Mutable | Date when the turbine was installed at the offshore location, marking the start of its operational lifecycle, warranty period, and maintenance schedule | Must be a valid date with format YYYY-MM-DD | None |
 | `latitude` | decimal | Yes | Mutable | Precise latitude position of the turbine within the wind farm array, critical for navigation, maintenance vessel positioning, and wake effect calculations | Range: -90 to 90 | None |
 | `longitude` | decimal | Yes | Mutable | Precise longitude position of the turbine within the wind farm array, critical for navigation, maintenance vessel positioning, and wake effect calculations | Range: -180 to 180 | None |
 | `metadata.created_at` | timestamp | Yes | Never | Precise moment when the turbine record was first created, used for audit trails, lifecycle tracking, and chronological analysis of farm development | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Current time |
@@ -205,6 +210,8 @@ This system will provide functionality for managing the complete lifecycle of of
 | `metadata.deleted_at` | timestamp | No | Mutable | When populated, indicates the turbine has been soft-deleted but is maintained for historical records, warranty claims, and lifecycle analysis | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Null |
 
 ### 3.3 Maintenance Model
+
+#### 3.3.1 JSON Schema
 ```json
 {
   "maintenance_id": "uuid",
@@ -222,7 +229,7 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
-#### Field Specifications
+#### 3.3.2 Field Specifications
 | Field Name | Type | Required | Mutable | Description | Constraints | Default |
 |-------|------|----------|---------|-------------|------------|---------|
 | `maintenance_id` | uuid | Yes | Never | Primary identifier for the maintenance record that remains consistent throughout its lifecycle, used for tracking, reporting, and historical analysis of turbine service history | Immutable unique identifier | None |
@@ -241,15 +248,15 @@ This system will provide functionality for managing the complete lifecycle of of
 
 ### 4.1 Conditional Field Requirements
 
-#### Wind Farm Model
+#### 4.1.1 Wind Farm Model
 - `commissioned_date` field becomes required when `status` transitions to "OPERATIONAL"
 - A Wind Farm cannot be directly created with `status` "DECOMMISSIONED" (must follow proper state transitions)
 
-#### Turbine Model
+#### 4.1.2 Turbine Model
 - `installation_date` field becomes required when `status` transitions to "INSTALLED" 
 - `capacity` field cannot be modified once the Turbine status is "OPERATIONAL"
 
-#### Maintenance Model
+#### 4.1.3 Maintenance Model
 - `end_date` field becomes required when `status` is "COMPLETED"
 - `turbine_id` field cannot be modified once a maintenance record is created
 - `start_date` should be before `end_date`
@@ -338,20 +345,20 @@ This system will provide functionality for managing the complete lifecycle of of
 
 ### 4.6 Deletion Audit Requirements
 
-**Audit Trail:**
+#### 4.6.1 Audit Trail:
 
 - All deletion attempts (successful or prevented) must be logged with:
   - Timestamp of deletion attempt (ISO 8601 format)
   - User or system identifier that initiated the deletion
   - Resource ID and type
 
-**Retention Period:**
+#### 4.6.2 Retention Period:
 
 - Deletion audit logs must be retained for a minimum of 7 years
 - Deletion of critical infrastructure components must be retained for 15 years
 - Audit logs cannot be deleted or modified once created
 
-**Regulatory Compliance:**
+#### 4.6.3 Regulatory Compliance:
 
 - Deletion of certain resources may require regulatory notification
 - Critical infrastructure deletions may require additional approval workflow
@@ -409,14 +416,24 @@ This system will provide functionality for managing the complete lifecycle of of
       "message": "Capacity must be greater than 0."
     },
     {
-      "id": "INVALID_TURBINE_COUNT",
-      "field": "turbine_count",
-      "message": "Turbine count must be at least 1."
+      "id": "MISSING_LOCATION_LATITUDE",
+      "field": "location_latitude",
+      "message": "Location latitude is required."
     },
     {
-      "id": "INVALID_LOCATION",
+      "id": "MISSING_LOCATION_LONGITUDE",
+      "field": "location_longitude",
+      "message": "Location longitude is required."
+    },
+    {
+      "id": "INVALID_LOCATION_LATITUDE",
       "field": "location_latitude",
       "message": "Latitude must be between -90 and 90."
+    },
+    {
+      "id": "INVALID_LOCATION_LONGITUDE",
+      "field": "location_longitude",
+      "message": "Longitude must be between -180 and 180."
     }
   ]
 }
@@ -540,13 +557,9 @@ This system will provide functionality for managing the complete lifecycle of of
       "id": "INVALID_CAPACITY",
       "field": "capacity",
       "message": "Capacity must be greater than 0."
-    },
-    {
-      "id": "INVALID_TURBINE_COUNT",
-      "field": "turbine_count",
-      "message": "Turbine count must be at least 1."
     }
   ]
+}
 ```
 
 - **404 Not Found:**
@@ -672,7 +685,7 @@ This system will provide functionality for managing the complete lifecycle of of
   "rotor_diameter": "decimal", // Required - Diameter of the turbine rotor
   "latitude": "decimal", // Required - Precise latitude position
   "longitude": "decimal", // Required - Precise longitude position
-  "installation_date": "date" // Optional - Date of installation (required when status is INSTALLED)
+  "installation_date": "date" // Required - Date of installation (required since status is INSTALLED)
 }
 ```
 
@@ -857,7 +870,7 @@ This system will provide functionality for managing the complete lifecycle of of
     {
       "id": "MISSING_INSTALLATION_DATE",
       "field": "installation_date",
-      "message": "Installation date is required when status is OPERATIONAL."
+      "message": "Installation date is required when status is INSTALLED."
     },
     {
       "id": "INVALID_CAPACITY_MODIFICATION",
@@ -1461,7 +1474,7 @@ PATCH /api/v1/windfarms/f8e7d6c5-b4a3-2c1d-9e8f-7a6b5c4d3e2f
   "name": "North Sea Winds",
   "status": "OPERATIONAL",
   "capacity": 450.0,
-  "turbine_count": 45,
+  "turbine_count": 2,
   "location_latitude": 55.4,
   "location_longitude": 2.3,
   "water_depth": 35.0,
