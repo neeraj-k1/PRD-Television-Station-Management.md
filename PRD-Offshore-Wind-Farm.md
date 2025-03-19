@@ -43,68 +43,84 @@ This system will provide functionality for managing the complete lifecycle of of
 
 ### 2.4 Error Handling
 
-#### 2.4.1 Error Response Schema when we have multiple errors for a particular status code
-```json
-{
-  "error_id": "ERROR_CODE",
-  "errors":[
-    {
-      "id": "DOMAIN_SPECIFIC_ERROR_CODE",
-      "field": "FIELD_NAME",
-      "message": "ERROR_MESSAGE"
-    }
-  ]
-}
-```
-#### 2.4.2 Error Response Schema when we have a single error for a particular status code
-```json
-{
-  "error_id": "ERROR_CODE",
-  "message": "ERROR_MESSAGE"
-}
-```
-
-#### 2.4.3 Error examples
-
-- `400 Bad Request`:
-
+#### 2.4.1. **`400 Bad Request` (Validation Errors)**
 ```json
 {
     "error_id": "VALIDATION_ERROR",
     "errors": [
         {
-            "id": "invalid_field_name_1",
-            "field": "field_name_1",
-            "message": "Descriptive error message explaining the validation issue."
-        },
-        {
-            "id": "invalid_field_name_2",
-            "field": "field_name_2",
+            "id": "INVALID_FIELD_NAME",
+            "field": "field_name",
             "message": "Descriptive error message explaining the validation issue."
         }
     ]
 }
 ```
+- **`error_id`**: Identifies the error category; use `"VALIDATION_ERROR"` for validation issues.
+- **`errors`**: An array of objects, each detailing a specific validation error.
+  - **`id`**: A unique error code (e.g., `"INVALID_FIELD_NAME"`) that categorizes the error.
+  - **`field`**: The specific field that triggered the validation error.
+  - **`message`**: A clear, descriptive explanation of the validation issue.
 
-- `404 Not Found`:
-
+#### 2.4.2. **`404 Not Found`**
 ```json
 {
     "error_id": "RESOURCE_NOT_FOUND",
-    "message": "Descriptive message about the missing resource."
+    "message": "The requested resource was not found."
 }
 ```
+- **`error_id`**: Identifies the error type; use an identifier like `"ABC_NOT_FOUND"` for missing resources.
+- **`message`**: Clearly states which resource was not found (e.g., `"Abc resource not found"`).
 
-- `409 Conflict`:
-
+#### 2.4.3. **`409 Conflict`**
 ```json
 {
-  "error_id": "RESOURCE_CONFLICT",
-  "message": "Descriptive message explaining the conflict."
+    "error_id": "RESOURCE_CONFLICT",
+    "errors": [
+        {
+            "id": "RESOURCE_STATE_CONFLICT",
+            "field": "status",
+            "message": "The resource cannot be modified due to its current state."
+        }
+    ]
 }
 ```
+- **`error_id`**: Indicates the conflict error type; use `"RESOURCE_CONFLICT"`.
+- **`errors`**: An array of objects detailing each conflict.
+  - **`id`**: A unique error code (e.g., `"EXISTING_RESOURCE"`) specifying the type of conflict.
+  - **`field`**: Specifies the field or resource that is in conflict.
+  - **`message`**: Explains the nature of the conflict.
 
-**Error Handling Principles**:
+#### 2.4.4. **`422 Unprocessable Entity`**
+```json
+{
+    "error_id": "UNPROCESSABLE_ENTITY",
+    "errors": [
+        {
+            "id": "INVALID_RELATIONSHIP",
+            "field": "related_field",
+            "message": "The proposed relationship violates system constraints."
+        }
+    ]
+}
+```
+- **`error_id`**: Identifies the error type; use `"UNPROCESSABLE_ENTITY"` for processing issues.
+- **`errors`**: An array of objects, each detailing a specific processing error.
+  - **`id`**: A unique error code (e.g., `"INVALID_RELATIONSHIP"`) that categorizes the error.
+  - **`field`**: Specifies the field that caused the error.
+  - **`message`**: Provides a clear explanation of why the entity cannot be processed.
+
+#### 2.4.5. **`500 Internal Server Error`**  
+```json
+{
+    "error_id": "INTERNAL_SERVER_ERROR",
+    "message": "An unexpected error occurred while processing the request. Please try again later."
+}
+```
+- **`error_id`**: Identifies the error category; use `"INTERNAL_SERVER_ERROR"` to indicate a server-side error.
+- **`message`**: Provides a clear explanation that an unexpected error occurred and advises the client to try again later.
+
+#### 2.4.6. Error Handling Principles
 - Always return appropriate HTTP status codes
 - Include unique error identifiers for log tracking
 - Maintain consistency across all endpoints
@@ -135,7 +151,7 @@ This system will provide functionality for managing the complete lifecycle of of
   "name": "string",
   "status": "PLANNED|OPERATIONAL|DECOMMISSIONED",
   "capacity": "decimal",
-  "turbine_count": "integer",
+  "turbine_ids": ["uuid"],
   "location_latitude": "decimal",
   "location_longitude": "decimal",
   "water_depth": "decimal",
@@ -157,12 +173,12 @@ This system will provide functionality for managing the complete lifecycle of of
 | `name` | string | Yes | Mutable | Official name of the wind farm used in documentation, regulatory filings, and grid connection agreements that will appear on all operational reports and compliance documents | Length: 1-100 | None |
 | `status` | enum | Yes | Mutable | Current state of the wind farm that determines its development stage, operational capabilities, and regulatory requirements, affecting energy production forecasts and maintenance scheduling | [`PLANNED`, `OPERATIONAL`, `DECOMMISSIONED`] | `PLANNED` |
 | `capacity` | decimal | Yes | Mutable | Total energy generation capacity of the wind farm in megawatts (MW), critical for production forecasting, grid integration planning, and revenue projections | Must be greater than 0 | None |
-| `turbine_count` | integer | Yes | Mutable | Number of wind turbines deployed or planned for deployment in the farm, essential for layout planning, maintenance scheduling, and resource allocation | Min: 0 | None |
+| `turbine_ids` | array of uuid | No | Mutable | List of turbine IDs associated with this wind farm, establishing direct relationships between the farm and its turbines for comprehensive management and monitoring. Relationship Type: One-to-Many (Wind Farm to Turbines) | Each ID must reference an existing turbine | Empty array |
 | `location_latitude` | decimal | Yes | Mutable | Latitude coordinate of the farm's center point, essential for navigation, territorial jurisdiction determination, and weather forecasting | Range: -90 to 90 | None |
 | `location_longitude` | decimal | Yes | Mutable | Longitude coordinate of the farm's center point, essential for navigation, territorial jurisdiction determination, and weather forecasting | Range: -180 to 180 | None |
 | `water_depth` | decimal | Yes | Mutable | Average depth of water at the site in meters, determining foundation type, installation methods, and maintenance vessel requirements | Min: 0 | None |
 | `distance_to_shore` | decimal | Yes | Mutable | Distance from site center to nearest shoreline in kilometers, affecting transmission costs, maintenance accessibility, and emergency response time | Min: 0 | None |
-| `commissioned_date` | date | No | Mutable | Date when the wind farm became or is expected to become operational, important for regulatory compliance, warranty periods, and operational planning | Must be a valid date with format YYYY-MM-DD | None |
+| `commissioned_date` | date | No | Immutable | Date when the wind farm became or is expected to become operational, important for regulatory compliance, warranty periods, and operational planning | Must be a valid date with format YYYY-MM-DD | None |
 | `metadata.created_at` | timestamp | Yes | Never | Precise moment when the wind farm record was first created, used for audit trails and chronological tracking of farm development | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Current time |
 | `metadata.updated_at` | timestamp | Yes | Mutable | Timestamp of the most recent modification to any wind farm field, used for tracking changes, synchronization, and version control | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Current time |
 | `metadata.deleted_at` | timestamp | No | Mutable | When populated, indicates the wind farm has been soft-deleted and should be excluded from active operations while maintaining historical record for regulatory compliance | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Null |
@@ -181,8 +197,6 @@ This system will provide functionality for managing the complete lifecycle of of
   "hub_height": "decimal",
   "rotor_diameter": "decimal",
   "installation_date": "date",
-  "latitude": "decimal",
-  "longitude": "decimal",
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -195,16 +209,14 @@ This system will provide functionality for managing the complete lifecycle of of
 | Field Name | Type | Required | Mutable | Description | Constraints | Default |
 |-------|------|----------|---------|-------------|------------|---------|
 | `turbine_id` | uuid | Yes | Never | Primary identifier for the turbine that remains consistent throughout its lifecycle, used in all API operations, maintenance tracking, and performance analysis | Immutable unique identifier | None |
-| `farm_id` | uuid | Yes | Never | Reference to the parent wind farm this turbine belongs to, establishing the hierarchical relationship between farm and turbine for operational management and reporting | Must reference existing wind farm | None |
+| `farm_id` | uuid | Yes | Never | Reference to the parent wind farm this turbine belongs to, establishing the hierarchical relationship between farm and turbine for operational management and reporting. Relationship Type: Many-to-One (Turbine to Wind Farm) | Must reference existing wind farm | None |
 | `name` | string | Yes | Mutable | Identifying name or number of the turbine within the wind farm, used in technical documentation, maintenance records, and operational communications | Length: 1-100 | None |
 | `model` | string | Yes | Mutable | Manufacturer and model designation of the turbine, determining its specifications, warranty terms, and maintenance requirements | Length: 1-100 | None |
 | `status` | enum | Yes | Mutable | Current operational state of the turbine that determines its availability for energy production, maintenance needs, and inclusion in farm output calculations | [`INSTALLED`, `OPERATIONAL`, `MAINTENANCE`, `INACTIVE`] | `INSTALLED` |
 | `capacity` | decimal | Yes | Mutable | Maximum power generation capacity of the turbine in megawatts (MW), essential for production planning, load balancing, and individual turbine performance assessment | Must be greater than 0 | None |
 | `hub_height` | decimal | Yes | Mutable | Height of the turbine hub above sea level in meters, affecting wind capture efficiency, structural requirements, and navigation clearance considerations | Must be greater than 0 | None |
 | `rotor_diameter` | decimal | Yes | Mutable | Diameter of the turbine rotor in meters, determining the swept area, potential energy capture, and minimum spacing requirements between turbines | Must be greater than 0 | None |
-| `installation_date` | date | Yes | Mutable | Date when the turbine was installed at the offshore location, marking the start of its operational lifecycle, warranty period, and maintenance schedule | Must be a valid date with format YYYY-MM-DD | None |
-| `latitude` | decimal | Yes | Mutable | Precise latitude position of the turbine within the wind farm array, critical for navigation, maintenance vessel positioning, and wake effect calculations | Range: -90 to 90 | None |
-| `longitude` | decimal | Yes | Mutable | Precise longitude position of the turbine within the wind farm array, critical for navigation, maintenance vessel positioning, and wake effect calculations | Range: -180 to 180 | None |
+| `installation_date` | date | Yes | Immutable | Date when the turbine was installed at the offshore location, marking the start of its operational lifecycle, warranty period, and maintenance schedule | Must be a valid date with format YYYY-MM-DD | None |
 | `metadata.created_at` | timestamp | Yes | Never | Precise moment when the turbine record was first created, used for audit trails, lifecycle tracking, and chronological analysis of farm development | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Current time |
 | `metadata.updated_at` | timestamp | Yes | Mutable | Timestamp of the most recent modification to any turbine field, used for tracking changes, synchronization with maintenance systems, and configuration management | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Updates on any change | Current time |
 | `metadata.deleted_at` | timestamp | No | Mutable | When populated, indicates the turbine has been soft-deleted but is maintained for historical records, warranty claims, and lifecycle analysis | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Null |
@@ -216,7 +228,6 @@ This system will provide functionality for managing the complete lifecycle of of
 {
   "maintenance_id": "uuid",
   "turbine_id": "uuid",
-  "type": "SCHEDULED|UNSCHEDULED",
   "status": "PLANNED|IN_PROGRESS|COMPLETED",
   "description": "string",
   "start_date": "date",
@@ -233,10 +244,9 @@ This system will provide functionality for managing the complete lifecycle of of
 | Field Name | Type | Required | Mutable | Description | Constraints | Default |
 |-------|------|----------|---------|-------------|------------|---------|
 | `maintenance_id` | uuid | Yes | Never | Primary identifier for the maintenance record that remains consistent throughout its lifecycle, used for tracking, reporting, and historical analysis of turbine service history | Immutable unique identifier | None |
-| `turbine_id` | uuid | Yes | Never | Reference to the specific turbine receiving maintenance, establishing relationship between maintenance activities and assets for comprehensive service history tracking | Must reference existing turbine | None |
-| `type` | enum | Yes | Mutable | Classification of maintenance activity based on planning and urgency, determining resource allocation, vessel requirements, and impact on production forecasts | [`SCHEDULED`, `UNSCHEDULED`] | `SCHEDULED` |
+| `turbine_id` | uuid | Yes | Never | Reference to the specific turbine receiving maintenance, establishing relationship between maintenance activities and assets for comprehensive service history tracking. Relationship Type: Many-to-One (Maintenance to Turbine) | Must reference existing turbine | None |
 | `status` | enum | Yes | Mutable | Current state of the maintenance activity in its workflow, tracking progress from planning through execution to completion for operational oversight | [`PLANNED`, `IN_PROGRESS`, `COMPLETED`] | `PLANNED` |
-| `description` | string | Yes | Mutable | Detailed explanation of the maintenance activity, issues addressed, and work performed, providing context for operations teams and future maintenance planning | Length: 1-500 | None |
+| `description` | string | No | Mutable | Detailed explanation of the maintenance activity, issues addressed, and work performed, providing context for operations teams and future maintenance planning | Length: 1-500 | None |
 | `start_date` | date | Yes | Mutable | Planned or actual date when maintenance begins, used for scheduling maintenance vessels, technician teams, and calculating production impact during servicing | Must be a valid date with format YYYY-MM-DD | None |
 | `end_date` | date | No | Mutable | Planned or actual date when maintenance concludes, used for tracking duration, coordinating return to service, and analyzing maintenance efficiency | Must be a valid date with format YYYY-MM-DD | None |
 | `metadata.created_at` | timestamp | Yes | Never | Precise moment when the maintenance record was first created, used for audit trails, maintenance history chronology, and service interval tracking | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, set on creation | Current time |
@@ -250,16 +260,18 @@ This system will provide functionality for managing the complete lifecycle of of
 
 #### 4.1.1 Wind Farm Model
 - `commissioned_date` field becomes required when `status` transitions to "OPERATIONAL"
-- A Wind Farm cannot be directly created with `status` "DECOMMISSIONED" (must follow proper state transitions)
+- `commissioned_date` cannot be modified once the Wind Farm status is "OPERATIONAL"
+- A Wind Farm cannot be directly created with `status` "DECOMMISSIONED" or "OPERATIONAL" (must follow proper state transitions)
+- `capacity` becomes required when `turbine_ids` array is not empty
+- `distance_to_shore` field becomes required when status changes from "PLANNED" to "OPERATIONAL"
 
 #### 4.1.2 Turbine Model
-- `installation_date` field becomes required when `status` transitions to "INSTALLED" 
-- `capacity` field cannot be modified once the Turbine status is "OPERATIONAL"
+- `capacity` field cannot be modified when the Turbine status is "OPERATIONAL"
 
 #### 4.1.3 Maintenance Model
 - `end_date` field becomes required when `status` is "COMPLETED"
-- `turbine_id` field cannot be modified once a maintenance record is created
 - `start_date` should be before `end_date`
+- `description` should be provided when status is "COMPLETED".
 
 ### 4.2 State Machine Transitions
 
@@ -286,8 +298,9 @@ This system will provide functionality for managing the complete lifecycle of of
 #### 4.3.1 Wind Farm and Turbine Relationships
 - Turbines can only reference Wind Farms that are not "DECOMMISSIONED"
 - When a Wind Farm's status changes to "DECOMMISSIONED", all associated Turbines should have status "INACTIVE"
-- Total `capacity` of all Turbines must not exceed the Wind Farm's `capacity`
-- `turbine_count` in Wind Farm must match the actual count of associated Turbines
+- Total `capacity` of all Turbines (referenced by `turbine_ids`) must not exceed the Wind Farm's `capacity`
+- The `turbine_ids` array must contain only valid turbine IDs that exist in the system
+- When a Turbine is created with a reference to a Wind Farm, that Turbine's ID must be automatically added to the Wind Farm's `turbine_ids` array
 
 #### 4.3.2 Turbine and Maintenance Relationships
 - Maintenance records can only reference Turbines that are not "INACTIVE"
@@ -300,7 +313,6 @@ This system will provide functionality for managing the complete lifecycle of of
 1. **Initial Planning**
    - Create Wind Farm record with status "PLANNED"
    - Define basic attributes (name, location coordinates, water depth, distance to shore)
-   - Set initial capacity and turbine count
 
 2. **Turbine Installation**
    - Add all INSTALLED turbines to the wind farm
@@ -308,12 +320,11 @@ This system will provide functionality for managing the complete lifecycle of of
    - Verify total turbine capacity is less than or equal to the wind farm's capacity
 
 3. **Operational Readiness**
-   - Confirm all turbines are in "OPERATIONAL" status
    - Set commissioned_date to the current date
    - Change wind farm status to "OPERATIONAL"
 
 **Rollback Scenarios:**
-- If the total turbine capacity exceeds the wind farm's capacity, the wind farm must remain in "PLANNED" status until the capacity is reduced by removing turbines.
+- If the total turbine capacity exceeds the wind farm's capacity, prevent the wind farm from transitioning to OPERATIONAL status. Rollback by updating the wind farm's capacity specification or removing excess turbines.
 
 ### 4.5 Deletion Behavior
 
@@ -328,11 +339,11 @@ This system will provide functionality for managing the complete lifecycle of of
 
 #### 4.5.2 Turbine Model Deletion Rules
 - Turbine deletion MUST be prevented if:
-  - It has status "OPERATIONAL".
+  - It has status "OPERATIONAL", "MAINTENANCE", "INSTALLED".
 
 - When a Turbine is marked for deletion (metadata.deleted_at populated):
   - Turbine remains in database for historical reference
-  - Wind Farm's turbine_count should be decremented
+  - Turbine ID should be removed from the associated Wind Farm's `turbine_ids` array
   - Turbine is excluded from standard turbine listings
 
 #### 4.5.3 Maintenance Model Deletion Rules
@@ -362,7 +373,6 @@ This system will provide functionality for managing the complete lifecycle of of
 
 - Deletion of certain resources may require regulatory notification
 - Critical infrastructure deletions may require additional approval workflow
-- Mass deletions (more than 10 resources of the same type within 24 hours) require higher level authorization
 
 
 ## 5. Comprehensive API Endpoints
@@ -377,7 +387,6 @@ This system will provide functionality for managing the complete lifecycle of of
 {
   "name": "string", // Required - Official name of the wind farm
   "capacity": "decimal", // Required - Total energy generation capacity in megawatts
-  "turbine_count": "integer", // Required - Number of turbines planned or deployed
   "location_latitude": "decimal", // Required - Latitude coordinate of farm's center
   "location_longitude": "decimal", // Required - Longitude coordinate of farm's center
   "water_depth": "decimal", // Required - Average water depth in meters
@@ -406,12 +415,12 @@ This system will provide functionality for managing the complete lifecycle of of
   "error_id": "VALIDATION_ERROR",
   "errors": [
     {
-      "id": "INVALID_NAME",
+      "id": "INVALID_NAME_LENGTH",
       "field": "name",
       "message": "Name must be between 1 and 100 characters."
     },
     {
-      "id": "INVALID_CAPACITY",
+      "id": "INVALID_CAPACITY_VALUE",
       "field": "capacity",
       "message": "Capacity must be greater than 0."
     },
@@ -421,37 +430,19 @@ This system will provide functionality for managing the complete lifecycle of of
       "message": "Location latitude is required."
     },
     {
-      "id": "MISSING_LOCATION_LONGITUDE",
-      "field": "location_longitude",
-      "message": "Location longitude is required."
-    },
-    {
-      "id": "INVALID_LOCATION_LATITUDE",
+      "id": "LATITUDE_OUT_OF_RANGE",
       "field": "location_latitude",
       "message": "Latitude must be between -90 and 90."
-    },
-    {
-      "id": "INVALID_LOCATION_LONGITUDE",
-      "field": "location_longitude",
-      "message": "Longitude must be between -180 and 180."
     }
   ]
-}
-```
-
-- **422 Unprocessable Entity:**
-```json
-{
-  "error_id": "UNPROCESSABLE_ENTITY",
-  "message": "Cannot create wind farm with status OPERATIONAL or DECOMMISSIONED."
 }
 ```
 
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -465,7 +456,7 @@ This system will provide functionality for managing the complete lifecycle of of
   "name": "string",
   "status": "PLANNED|OPERATIONAL|DECOMMISSIONED",
   "capacity": "decimal",
-  "turbine_count": "integer",
+  "turbine_ids": ["uuid"],
   "location_latitude": "decimal",
   "location_longitude": "decimal",
   "water_depth": "decimal",
@@ -474,7 +465,7 @@ This system will provide functionality for managing the complete lifecycle of of
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
-    "deleted_at": null
+    "deleted_at": "timestamp" | null
   }
 }
 ```
@@ -489,11 +480,19 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
+- **404 Resource Deleted:**
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Wind Farm with ID {farmId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
+
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -505,7 +504,7 @@ This system will provide functionality for managing the complete lifecycle of of
 {
   "name": "string", // Optional - Updated name of the wind farm
   "capacity": "decimal", // Optional - Updated capacity in megawatts
-  "turbine_count": "integer", // Optional - Updated number of turbines
+  "turbine_ids": ["uuid"], // Optional - Updated list of turbine IDs
   "location_latitude": "decimal", // Optional - Updated latitude coordinate
   "location_longitude": "decimal", // Optional - Updated longitude coordinate
   "water_depth": "decimal", // Optional - Updated water depth
@@ -522,7 +521,7 @@ This system will provide functionality for managing the complete lifecycle of of
   "name": "string",
   "status": "PLANNED|OPERATIONAL|DECOMMISSIONED",
   "capacity": "decimal",
-  "turbine_count": "integer",
+  "turbine_ids": ["uuid"],
   "location_latitude": "decimal",
   "location_longitude": "decimal",
   "water_depth": "decimal",
@@ -544,17 +543,7 @@ This system will provide functionality for managing the complete lifecycle of of
   "error_id": "VALIDATION_ERROR",
   "errors": [
     {
-      "id": "INVALID_STATUS_TRANSITION",
-      "field": "status",
-      "message": "Cannot transition from OPERATIONAL to PLANNED or from DECOMMISSIONED to any other status."
-    },
-    {
-      "id": "MISSING_COMMISSIONED_DATE",
-      "field": "commissioned_date",
-      "message": "Commissioned date is required when status is OPERATIONAL."
-    },
-    {
-      "id": "INVALID_CAPACITY",
+      "id": "INVALID_CAPACITY_VALUE",
       "field": "capacity",
       "message": "Capacity must be greater than 0."
     }
@@ -565,7 +554,7 @@ This system will provide functionality for managing the complete lifecycle of of
 - **404 Not Found:**
 ```json
 {
-  "error_id": "RESOURCE_NOT_FOUND",
+  "error_id": "WINDFARM_NOT_FOUND",
   "message": "Wind Farm with ID {farmId} not found."
 }
 ```
@@ -574,15 +563,40 @@ This system will provide functionality for managing the complete lifecycle of of
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "turbine_count is not matching the number of turbines associated with the wind farm."
+  "errors": [
+    {
+      "id": "TURBINE_LIST_MISMATCH",
+      "field": "turbine_ids",
+      "message": "The provided turbine IDs do not match the turbines associated with this wind farm."
+    },
+    {
+      "id": "INVALID_STATUS_TRANSITION",
+      "field": "status",
+      "message": "Cannot transition from OPERATIONAL to PLANNED or from DECOMMISSIONED to any other status."
+    }
+  ]
+}
+```
+
+- **422 Unprocessable Entity:**
+```json
+{
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "errors": [
+    {
+      "id": "IMMUTABLE_COMMISSIONED_DATE",
+      "field": "commissioned_date",
+      "message": "commissioned_date is immutable once the status is operational"
+    }
+  ]
 }
 ```
 
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -596,7 +610,7 @@ This system will provide functionality for managing the complete lifecycle of of
 - **404 Not Found:**
 ```json
 {
-  "error_id": "RESOURCE_NOT_FOUND",
+  "error_id": "WINDFARM_NOT_FOUND",
   "message": "Wind Farm with ID {farmId} not found."
 }
 ```
@@ -605,15 +619,21 @@ This system will provide functionality for managing the complete lifecycle of of
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot delete wind farm with OPERATIONAL status and operational turbines."
+  "errors": [
+    {
+      "id": "ACTIVE_WINDFARM_DELETION",
+      "field": "status",
+      "message": "Cannot delete wind farm with OPERATIONAL status and operational turbines."
+    }
+  ]
 }
 ```
 
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -621,8 +641,8 @@ This system will provide functionality for managing the complete lifecycle of of
 **URL:** GET /api/v1/windfarms
 
 **Query Parameters:**
-- status (optional): Filter by status (PLANNED, OPERATIONAL, DECOMMISSIONED)
-- include_deleted (optional): Include soft-deleted wind farms
+- status.eq: string (optional) - Filter by exact status match (PLANNED, OPERATIONAL, DECOMMISSIONED)
+- include_deleted: boolean (optional, default: false) - Whether to include soft-deleted wind farms
 
 **Success Response (200 OK):**
 ```json
@@ -633,7 +653,6 @@ This system will provide functionality for managing the complete lifecycle of of
       "name": "string",
       "status": "PLANNED|OPERATIONAL|DECOMMISSIONED",
       "capacity": "decimal",
-      "turbine_count": "integer",
       "location_latitude": "decimal",
       "location_longitude": "decimal",
       "water_depth": "decimal",
@@ -642,7 +661,7 @@ This system will provide functionality for managing the complete lifecycle of of
       "metadata": {
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "deleted_at": "timestamp"
+        "deleted_at": "timestamp" | null
       }
     }
   ],
@@ -656,15 +675,21 @@ This system will provide functionality for managing the complete lifecycle of of
 ```json
 {
   "error_id": "VALIDATION_ERROR",
-  "message": "Invalid query parameter value."
+  "errors": [
+    {
+      "id": "INVALID_QUERY_PARAMETER",
+      "field": "status",
+      "message": "Invalid query parameter value."
+    }
+  ]
 }
 ```
 
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -679,12 +704,9 @@ This system will provide functionality for managing the complete lifecycle of of
   "farm_id": "uuid", // Required - Reference to parent wind farm
   "name": "string", // Required - Identifying name/number of the turbine
   "model": "string", // Required - Manufacturer and model designation
-  "status": "INSTALLED", // Optional, Default: INSTALLED
   "capacity": "decimal", // Required - Maximum power generation capacity
   "hub_height": "decimal", // Required - Height of turbine hub above sea level
   "rotor_diameter": "decimal", // Required - Diameter of the turbine rotor
-  "latitude": "decimal", // Required - Precise latitude position
-  "longitude": "decimal", // Required - Precise longitude position
   "installation_date": "date" // Required - Date of installation (required since status is INSTALLED)
 }
 ```
@@ -714,19 +736,9 @@ This system will provide functionality for managing the complete lifecycle of of
       "message": "Farm ID is required."
     },
     {
-      "id": "INVALID_CAPACITY",
+      "id": "INVALID_CAPACITY_VALUE",
       "field": "capacity",
       "message": "Capacity must be greater than 0."
-    },
-    {
-      "id": "INVALID_LATITUDE",
-      "field": "latitude",
-      "message": "Latitude must be between -90 and 90."
-    },
-    {
-      "id": "INVALID_LONGITUDE",
-      "field": "longitude",
-      "message": "Longitude must be between -180 and 180."
     },
     {
       "id": "MISSING_INSTALLATION_DATE",
@@ -740,7 +752,7 @@ This system will provide functionality for managing the complete lifecycle of of
 - **404 Not Found:**
 ```json
 {
-  "error_id": "RESOURCE_NOT_FOUND",
+  "error_id": "WINDFARM_NOT_FOUND",
   "message": "Referenced wind farm with ID {farm_id} not found."
 }
 ```
@@ -767,8 +779,8 @@ This system will provide functionality for managing the complete lifecycle of of
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -787,12 +799,10 @@ This system will provide functionality for managing the complete lifecycle of of
   "hub_height": "decimal",
   "rotor_diameter": "decimal",
   "installation_date": "date",
-  "latitude": "decimal",
-  "longitude": "decimal",
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
-    "deleted_at": null
+    "deleted_at": "timestamp" | null
   }
 }
 ```
@@ -807,11 +817,19 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
+- **404 Resource Deleted:**
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Turbine with ID {turbineId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
+
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -828,8 +846,6 @@ This system will provide functionality for managing the complete lifecycle of of
   "hub_height": "decimal", // Optional - Updated hub height
   "rotor_diameter": "decimal", // Optional - Updated rotor diameter
   "installation_date": "date", // Optional - Date of installation
-  "latitude": "decimal", // Optional - Updated latitude
-  "longitude": "decimal" // Optional - Updated longitude
 }
 ```
 
@@ -845,8 +861,6 @@ This system will provide functionality for managing the complete lifecycle of of
   "hub_height": "decimal",
   "rotor_diameter": "decimal",
   "installation_date": "date",
-  "latitude": "decimal",
-  "longitude": "decimal",
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
@@ -870,22 +884,12 @@ This system will provide functionality for managing the complete lifecycle of of
     {
       "id": "MISSING_INSTALLATION_DATE",
       "field": "installation_date",
-      "message": "Installation date is required when status is INSTALLED."
+      "message": "Installation date is required when status is OPERATIONAL."
     },
     {
-      "id": "INVALID_CAPACITY_MODIFICATION",
+      "id": "IMMUTABLE_CAPACITY",
       "field": "capacity",
       "message": "Cannot modify capacity when turbine status is OPERATIONAL."
-    },
-    {
-      "id": "INVALID_LATITUDE",
-      "field": "latitude",
-      "message": "Latitude must be between -90 and 90."
-    },
-    {
-      "id": "INVALID_LONGITUDE",
-      "field": "longitude",
-      "message": "Longitude must be between -180 and 180."
     }
   ]
 }
@@ -896,6 +900,14 @@ This system will provide functionality for managing the complete lifecycle of of
 {
   "error_id": "RESOURCE_NOT_FOUND",
   "message": "Turbine with ID {turbineId} not found."
+}
+```
+
+- **404 Resource Deleted:**
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Turbine with ID {turbineId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
 }
 ```
 
@@ -910,7 +922,7 @@ This system will provide functionality for managing the complete lifecycle of of
       "message": "Cannot set status to OPERATIONAL when parent wind farm is not OPERATIONAL."
     },
     {
-      "id": "MAINTENANCE_CONFLICT",
+      "id": "MAINTENANCE_STATUS_CONFLICT",
       "field": "status",
       "message": "Cannot change status from MAINTENANCE when there are maintenance records with IN_PROGRESS status."
     }
@@ -921,8 +933,8 @@ This system will provide functionality for managing the complete lifecycle of of
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -941,19 +953,33 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
+- **404 Resource Deleted:**
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Turbine with ID {turbineId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
+
 - **409 Conflict:**
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot delete turbine with status OPERATIONAL."
+  "errors": [
+    {
+      "id": "ACTIVE_TURBINE_DELETION",
+      "field": "status",
+      "message": "Cannot delete turbine with status OPERATIONAL, MAINTENANCE, or INSTALLED."
+    }
+  ]
 }
 ```
 
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -961,8 +987,8 @@ This system will provide functionality for managing the complete lifecycle of of
 **URL:** GET /api/v1/windfarms/{farmId}/turbines
 
 **Query Parameters:**
-- status (optional): Filter by status (INSTALLED, OPERATIONAL, MAINTENANCE, INACTIVE)
-- include_deleted (optional): Include soft-deleted turbines
+- status.eq: string (optional) - Filter by exact status match (INSTALLED, OPERATIONAL, MAINTENANCE, INACTIVE)
+- include_deleted: boolean (optional, default: false) - Whether to include soft-deleted turbines
 
 **Success Response (200 OK):**
 ```json
@@ -977,12 +1003,10 @@ This system will provide functionality for managing the complete lifecycle of of
       "hub_height": "decimal",
       "rotor_diameter": "decimal",
       "installation_date": "date",
-      "latitude": "decimal",
-      "longitude": "decimal",
       "metadata": {
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "deleted_at": "timestamp"
+        "deleted_at": "timestamp" | null
       }
     }
   ],
@@ -995,7 +1019,7 @@ This system will provide functionality for managing the complete lifecycle of of
 - **404 Not Found:**
 ```json
 {
-  "error_id": "RESOURCE_NOT_FOUND",
+  "error_id": "WINDFARM_NOT_FOUND",
   "message": "Wind Farm with ID {farmId} not found."
 }
 ```
@@ -1003,8 +1027,8 @@ This system will provide functionality for managing the complete lifecycle of of
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1017,10 +1041,9 @@ This system will provide functionality for managing the complete lifecycle of of
 ```json
 {
   "turbine_id": "uuid", // Required - Reference to turbine requiring maintenance
-  "type": "SCHEDULED|UNSCHEDULED", // Required - Classification of maintenance activity
   "status": "PLANNED", // Optional, Default: PLANNED
   "description": "string", // Required - Detailed explanation of maintenance
-  "start_date": "date" // Required - Planned start date
+  "start_date": "date" // Required
 }
 ```
 
@@ -1029,7 +1052,6 @@ This system will provide functionality for managing the complete lifecycle of of
 {
   "maintenance_id": "uuid",
   "turbine_id": "uuid",
-  "type": "SCHEDULED|UNSCHEDULED",
   "status": "PLANNED",
   "metadata": {
     "created_at": "timestamp"
@@ -1050,14 +1072,14 @@ This system will provide functionality for managing the complete lifecycle of of
       "message": "Turbine ID is required."
     },
     {
-      "id": "INVALID_TYPE",
-      "field": "type",
-      "message": "Type must be either SCHEDULED or UNSCHEDULED."
-    },
-    {
       "id": "MISSING_DESCRIPTION",
       "field": "description",
       "message": "Description is required."
+    },
+    {
+      "id": "MISSING_START_DATE",
+      "field": "start_date",
+      "message": "Start date is required."
     }
   ]
 }
@@ -1066,7 +1088,7 @@ This system will provide functionality for managing the complete lifecycle of of
 - **404 Not Found:**
 ```json
 {
-  "error_id": "RESOURCE_NOT_FOUND",
+  "error_id": "TURBINE_NOT_FOUND",
   "message": "Referenced turbine with ID {turbine_id} not found."
 }
 ```
@@ -1075,15 +1097,21 @@ This system will provide functionality for managing the complete lifecycle of of
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot create maintenance for a turbine with INACTIVE status."
+  "errors": [
+    {
+      "id": "INACTIVE_TURBINE_MAINTENANCE",
+      "field": "turbine_id",
+      "message": "Cannot create maintenance for a turbine with INACTIVE status."
+    }
+  ]
 }
 ```
 
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1095,7 +1123,6 @@ This system will provide functionality for managing the complete lifecycle of of
 {
   "maintenance_id": "uuid",
   "turbine_id": "uuid",
-  "type": "SCHEDULED|UNSCHEDULED",
   "status": "PLANNED|IN_PROGRESS|COMPLETED",
   "description": "string",
   "start_date": "date",
@@ -1103,7 +1130,7 @@ This system will provide functionality for managing the complete lifecycle of of
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
-    "deleted_at": null
+    "deleted_at": "timestamp" | null
   }
 }
 ```
@@ -1118,11 +1145,19 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
+- **404 Resource Deleted:**
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Maintenance record with ID {maintenanceId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
+
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1132,7 +1167,6 @@ This system will provide functionality for managing the complete lifecycle of of
 **Request Body Schema:**
 ```json
 {
-  "type": "SCHEDULED|UNSCHEDULED", // Optional - Updated maintenance type
   "status": "PLANNED|IN_PROGRESS|COMPLETED", // Optional - Updated status
   "description": "string", // Optional - Updated description
   "start_date": "date", // Optional - Updated start date
@@ -1145,7 +1179,6 @@ This system will provide functionality for managing the complete lifecycle of of
 {
   "maintenance_id": "uuid",
   "turbine_id": "uuid",
-  "type": "SCHEDULED|UNSCHEDULED",
   "status": "PLANNED|IN_PROGRESS|COMPLETED",
   "description": "string",
   "start_date": "date",
@@ -1192,19 +1225,33 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
+- **404 Resource Deleted:**
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Maintenance record with ID {maintenanceId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
+
 - **409 Conflict:**
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot update maintenance when associated turbine is INACTIVE."
+  "errors": [
+    {
+      "id": "INACTIVE_TURBINE_MAINTENANCE",
+      "field": "turbine_id",
+      "message": "Cannot update maintenance when associated turbine is INACTIVE."
+    }
+  ]
 }
 ```
 
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1223,19 +1270,33 @@ This system will provide functionality for managing the complete lifecycle of of
 }
 ```
 
+- **404 Resource Deleted:**
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Maintenance record with ID {maintenanceId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
+
 - **409 Conflict:**
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot delete maintenance with status IN_PROGRESS."
+  "errors": [
+    {
+      "id": "ACTIVE_MAINTENANCE_DELETION",
+      "field": "status",
+      "message": "Cannot delete maintenance with status IN_PROGRESS."
+    }
+  ]
 }
 ```
 
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1243,9 +1304,8 @@ This system will provide functionality for managing the complete lifecycle of of
 **URL:** GET /api/v1/turbines/{turbineId}/maintenance
 
 **Query Parameters:**
-- status (optional): Filter by status (PLANNED, IN_PROGRESS, COMPLETED)
-- type (optional): Filter by type (SCHEDULED, UNSCHEDULED)
-- include_deleted (optional): Include soft-deleted maintenance records
+- status.eq: string (optional) - Filter by exact status match (PLANNED, IN_PROGRESS, COMPLETED)
+- include_deleted: boolean (optional, default: false) - Whether to include soft-deleted maintenance records
 
 **Success Response (200 OK):**
 ```json
@@ -1253,7 +1313,6 @@ This system will provide functionality for managing the complete lifecycle of of
   "maintenance": [
     {
       "maintenance_id": "uuid",
-      "type": "SCHEDULED|UNSCHEDULED",
       "status": "PLANNED|IN_PROGRESS|COMPLETED",
       "description": "string",
       "start_date": "date",
@@ -1261,7 +1320,7 @@ This system will provide functionality for managing the complete lifecycle of of
       "metadata": {
         "created_at": "timestamp",
         "updated_at": "timestamp",
-        "deleted_at": "timestamp"
+        "deleted_at": "timestamp" | null
       }
     }
   ],
@@ -1282,8 +1341,8 @@ This system will provide functionality for managing the complete lifecycle of of
 - **500 Internal Server Error:**
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred while processing your request."
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1303,7 +1362,6 @@ POST /api/v1/windfarms
 {
   "name": "North Sea Winds",
   "capacity": 450.0,
-  "turbine_count": 2,
   "location_latitude": 55.4,
   "location_longitude": 2.3,
   "water_depth": 35.0,
@@ -1335,12 +1393,9 @@ POST /api/v1/turbines
   "farm_id": "f8e7d6c5-b4a3-2c1d-9e8f-7a6b5c4d3e2f",
   "name": "NSW-T01",
   "model": "SeaWind X-10",
-  "status": "INSTALLED",
   "capacity": 10.0,
   "hub_height": 120.0,
   "rotor_diameter": 164.0,
-  "latitude": 55.395,
-  "longitude": 2.285,
   "installation_date": "2023-09-20"
 }
 ```
@@ -1366,12 +1421,9 @@ POST /api/v1/turbines
   "farm_id": "f8e7d6c5-b4a3-2c1d-9e8f-7a6b5c4d3e2f",
   "name": "NSW-T02",
   "model": "SeaWind X-10",
-  "status": "INSTALLED",
   "capacity": 10.0,
   "hub_height": 120.0,
   "rotor_diameter": 164.0,
-  "latitude": 55.398,
-  "longitude": 2.290,
   "installation_date": "2023-09-20"
 }
 ```
@@ -1412,8 +1464,6 @@ PATCH /api/v1/turbines/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d
   "hub_height": 120.0,
   "rotor_diameter": 164.0,
   "installation_date": "2023-09-20",
-  "latitude": 55.395,
-  "longitude": 2.285,
   "metadata": {
     "created_at": "2023-09-20T14:15:33.789Z",
     "updated_at": "2023-09-25T09:35:22.456Z"
@@ -1443,8 +1493,6 @@ PATCH /api/v1/turbines/b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7
   "hub_height": 120.0,
   "rotor_diameter": 164.0,
   "installation_date": "2023-09-20",
-  "latitude": 55.398,
-  "longitude": 2.290,
   "metadata": {
     "created_at": "2023-09-20T14:20:45.123Z",
     "updated_at": "2023-09-25T09:40:18.789Z"
@@ -1453,8 +1501,8 @@ PATCH /api/v1/turbines/b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7
 ```
 
 #### Step 4: Commission the Wind Farm
-- `turbine_count` is equal to the number of turbines in the wind farm.
-- `capacity` is greater than the sum of the capacity of all turbines in the wind farm.
+- All turbines referenced in `turbine_ids` must be in OPERATIONAL status
+- `capacity` is greater than the sum of the capacity of all turbines in the wind farm
 
 **Request:**
 ```
@@ -1474,7 +1522,7 @@ PATCH /api/v1/windfarms/f8e7d6c5-b4a3-2c1d-9e8f-7a6b5c4d3e2f
   "name": "North Sea Winds",
   "status": "OPERATIONAL",
   "capacity": 450.0,
-  "turbine_count": 2,
+  "turbine_ids": ["a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d", "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7"],
   "location_latitude": 55.4,
   "location_longitude": 2.3,
   "water_depth": 35.0,
@@ -1489,9 +1537,9 @@ PATCH /api/v1/windfarms/f8e7d6c5-b4a3-2c1d-9e8f-7a6b5c4d3e2f
 
 #### Potential Error Scenarios and Rollbacks
 
-**Example 1: Attempting to commission a wind farm without all turbines operational**
+### 6.3 Error Scenarios
 
-If we tried to commission the wind farm when some turbines were not yet operational:
+#### Example 1: Attempting to commission a wind farm without all turbines operational
 
 **Request:**
 ```
@@ -1508,13 +1556,17 @@ PATCH /api/v1/windfarms/f8e7d6c5-b4a3-2c1d-9e8f-7a6b5c4d3e2f
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot change status to OPERATIONAL when turbines are not all in OPERATIONAL status."
+  "errors": [
+    {
+      "id": "TURBINE_STATUS_CONFLICT",
+      "field": "status",
+      "message": "Cannot change status to OPERATIONAL when turbines are not all in OPERATIONAL status."
+    }
+  ]
 }
 ```
 
-**Example 2: Trying to change a turbine's capacity when it's operational**
-
-If we tried to modify a turbine's capacity after it's operational:
+#### Example 2: Trying to change a turbine's capacity when it's operational
 
 **Request:**
 ```
@@ -1532,7 +1584,7 @@ PATCH /api/v1/turbines/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d
   "error_id": "VALIDATION_ERROR",
   "errors": [
     {
-      "id": "INVALID_CAPACITY_MODIFICATION",
+      "id": "IMMUTABLE_CAPACITY",
       "field": "capacity",
       "message": "Cannot modify capacity when turbine status is OPERATIONAL."
     }
@@ -1540,7 +1592,7 @@ PATCH /api/v1/turbines/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d
 }
 ```
 
-**Example 3: Attempting to delete a wind farm with operational turbines**
+#### Example 3: Attempting to delete a wind farm with operational turbines
 
 **Request:**
 ```
@@ -1551,11 +1603,17 @@ DELETE /api/v1/windfarms/f8e7d6c5-b4a3-2c1d-9e8f-7a6b5c4d3e2f
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot delete wind farm with OPERATIONAL status and operational turbines."
+  "errors": [
+    {
+      "id": "ACTIVE_WINDFARM_DELETION",
+      "field": "status",
+      "message": "Cannot delete wind farm with OPERATIONAL status and operational turbines."
+    }
+  ]
 }
 ```
 
-**Example 4: Attempting to complete maintenance without providing end date**
+#### Example 4: Attempting to complete maintenance without providing end date
 
 **Request:**
 ```
@@ -1576,6 +1634,32 @@ PATCH /api/v1/maintenance/c5d6e7f8-a9b0-1c2d-3e4f-5a6b7c8d9e0f
       "id": "MISSING_END_DATE",
       "field": "end_date",
       "message": "End date is required when status is COMPLETED."
+    }
+  ]
+}
+```
+
+#### Example 5: Trying to modify commissioned_date after wind farm is operational
+
+**Request:**
+```
+PATCH /api/v1/windfarms/f8e7d6c5-b4a3-2c1d-9e8f-7a6b5c4d3e2f
+```
+```json
+{
+  "commissioned_date": "2023-10-15"
+}
+```
+
+**Response (422 Unprocessable Entity):**
+```json
+{
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "errors": [
+    {
+      "id": "IMMUTABLE_COMMISSIONED_DATE",
+      "field": "commissioned_date",
+      "message": "commissioned_date is immutable once the status is operational"
     }
   ]
 }
