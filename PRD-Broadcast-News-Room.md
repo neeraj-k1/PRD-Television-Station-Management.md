@@ -8,7 +8,7 @@ This document outlines the requirements for the Broadcast News Room API, which p
 
 ## 1.2 Scope
 
-The API's are designed to support the operations of a broadcast news room, including story creation, reporter assignment, equipment allocation, and broadcast scheduling. It is intended for use by broadcast news organizations and authorized external partners.
+The APIs are designed to support the operations of a broadcast news room, including story creation, reporter assignment, equipment allocation, and broadcast scheduling. It is intended for use by broadcast news organizations and authorized external partners.
 
 ## 2. Global API Specifications
 
@@ -20,57 +20,136 @@ The API's are designed to support the operations of a broadcast news room, inclu
 - No rate-limiting
 - No performance requirements
 - Resource IDs should be UUIDs
-- Handle complex aspects like story assignment, equipment allocation, and broadcast planning appropriately
 - When a resource ID is invalid or not found, always return 404 (no validation of UUID format)
+- Date fields should be in the format YYYY-MM-DD (ISO 8601 date format without time component)
+- When creating an object using a POST request, the `created_at` and `updated_at` fields will have the same value. Therefore, it is sufficient to include only the `created_at` field in the response payload.
 - Resources: stories, staff, equipment, feeds, broadcasts
 - Complex aspects: Manage story assignment, equipment allocation, and broadcast planning. The platform should also support the creation of new equipment types and the management of existing ones. The platform should also support the creation of new story categories and the management of existing ones.
 
 ### 2.2 Base URL Configuration
 - **Exact Base URL**: `/api/v1`
 - **Versioning Strategy**: Explicit version in URL to support future API evolution
-- **Global URL Pattern**:
-  - Parent Resources: `/{resource-type}` (for resources like stories, staff, equipment, feeds, broadcasts)
+- **Global URL Pattern**: 
+  - Parent Resources: `/{resource-type}`
   - Child/Nested Resources: `/{parent-resource}/{parent-id}/{child-resource}`
+  - Special Operations: `/{resource-type}/{operation}`
+- **Filtering Pattern**: Query parameters are used for filtering resources
+  - Exact match: `field.eq=value`
 
 ### 2.3 Timestamp Management
 - **Timestamp Type**: Server-managed
-- **Timestamp Fields**:  
+- **Timestamp Fields**:
   - `created_at`: Immutable creation timestamp
   - `updated_at`: Dynamically updated on any resource modification
-- **Format**: ISO 8601 Extended Format (e.g., "2024-02-03T15:30:45.123Z")
+  - `deleted_at`: Dynamically updated on any resource soft deletion
+- **Timestamp Format**: ISO 8601 Extended Format (e.g., "2024-02-03T15:30:45.123Z")
+- **Date Format**: ISO 8601 Date Format (e.g., "2024-02-03") for all date fields
 - **Time Zone**: Always stored in UTC
-- **Precision**: Millisecond-level accuracy
+- **Precision**: Millisecond-level accuracy for timestamps
 
-### 2.4 Error Response Specification
-**Detailed Error Response Schema**:
+### 2.4 Error Handling
+#### 2.4.1. **`400 Bad Request` (Validation Errors)**
 ```json
 {
-  "error_id": "ERROR_CODE",
-  "errors":[
-    {
-      "id": "DOMAIN_SPECIFIC_ERROR_CODE",
-      "field": "FIELD_NAME",
-      "message": "ERROR_MESSAGE"
-    }
-  ]
-}
-
-|
-
-{
-  "error_id": "ERROR_CODE",
-  "message": "ERROR_MESSAGE"
+    "error_id": "VALIDATION_ERROR",
+    "errors": [
+        {
+            "id": "INVALID_FIELD_NAME",
+            "field": "field_name",
+            "message": "Descriptive error message explaining the validation issue."
+        }
+    ]
 }
 ```
+- **`error_id`**: Identifies the error category; use `"VALIDATION_ERROR"` for validation issues.
+- **`errors`**: An array of objects, each detailing a specific validation error.
+  - **`id`**: A unique error code (e.g., `"INVALID_FIELD_NAME"`) that categorizes the error.
+  - **`field`**: The specific field that triggered the validation error.
+  - **`message`**: A clear, descriptive explanation of the validation issue.
 
-**Error Handling Principles**:
+#### 2.4.2. **`404 Not Found`**
+```json
+{
+    "error_id": "RESOURCE_NOT_FOUND",
+    "message": "The requested resource was not found."
+}
+```
+- **`error_id`**: Identifies the error type; use an identifier like `"ABC_NOT_FOUND"` for missing resources.
+- **`message`**: Clearly states which resource was not found (e.g., `"Abc resource not found"`).
+
+#### 2.4.3. **`409 Conflict`**
+```json
+{
+    "error_id": "RESOURCE_CONFLICT",
+    "errors": [
+        {
+            "id": "RESOURCE_STATE_CONFLICT",
+            "field": "status",
+            "message": "The resource cannot be modified due to its current state."
+        }
+    ]
+}
+```
+- **`error_id`**: Indicates the conflict error type; use `"RESOURCE_CONFLICT"`.
+- **`errors`**: An array of objects detailing each conflict.
+  - **`id`**: A unique error code (e.g., `"EXISTING_RESOURCE"`) specifying the type of conflict.
+  - **`field`**: Specifies the field or resource that is in conflict.
+  - **`message`**: Explains the nature of the conflict.
+
+#### 2.4.4. **`422 Unprocessable Entity`**
+```json
+{
+    "error_id": "UNPROCESSABLE_ENTITY",
+    "errors": [
+        {
+            "id": "INVALID_RELATIONSHIP",
+            "field": "related_field",
+            "message": "The proposed relationship violates system constraints."
+        }
+    ]
+}
+```
+- **`error_id`**: Identifies the error type; use `"UNPROCESSABLE_ENTITY"` for processing issues.
+- **`errors`**: An array of objects, each detailing a specific processing error.
+  - **`id`**: A unique error code (e.g., `"INVALID_RELATIONSHIP"`) that categorizes the error.
+  - **`field`**: Specifies the field that caused the error.
+  - **`message`**: Provides a clear explanation of why the entity cannot be processed.
+
+#### 2.4.5. **`500 Internal Server Error`**  
+```json
+{
+    "error_id": "INTERNAL_SERVER_ERROR",
+    "message": "An unexpected error occurred while processing the request. Please try again later."
+}
+```
+- **`error_id`**: Identifies the error category; use `"INTERNAL_SERVER_ERROR"` to indicate a server-side error.
+- **`message`**: Provides a clear explanation that an unexpected error occurred and advises the client to try again later.
+
+#### 2.4.6. Error Handling Principles
 - Always return appropriate HTTP status codes
 - Include unique error identifiers for log tracking
 - Maintain consistency across all endpoints
 
+### 2.5 Field Validation Principles
+#### 2.5.1 String Fields:
+  - Length constraints explicitly defined
+  - Trimmed of leading/trailing whitespaces
+  - Cannot be empty unless explicitly allowed
+
+#### 2.5.2 Numeric Fields:
+  - Precise range constraints
+  - Non-negative unless explicitly specified
+
+#### 2.5.3 Enum Fields:
+  - Strict matching against predefined values
+  - Case-sensitive matching
+  - No default values unless specified
+
 ## 3. Comprehensive Resource Models
 
 ### 3.1 Story Model
+
+#### 3.1.1 JSON Schema
 ```json
 {
   "story_id": "uuid",
@@ -91,7 +170,7 @@ The API's are designed to support the operations of a broadcast news room, inclu
 }
 ```
 
-#### Field Specifications
+#### 3.1.2 Field Specifications
 
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|--------------|
@@ -109,6 +188,8 @@ The API's are designed to support the operations of a broadcast news room, inclu
 
 
 ### 3.2 Staff Model
+
+#### 3.2.1 JSON Schema
 ```json
 {
   "staff_id": "uuid",
@@ -127,7 +208,7 @@ The API's are designed to support the operations of a broadcast news room, inclu
 }
 ```
 
-#### Field Specifications
+#### 3.2.2 Field Specifications
 
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|--------------|
@@ -144,6 +225,8 @@ The API's are designed to support the operations of a broadcast news room, inclu
 | `metadata.deleted_at` | timestamp | No | ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone, Valid date if deleted | Mutable | null | When populated, indicates the staff record has been soft-deleted while preserving historical assignments and broadcasts |
 
 ### 3.3 Equipment Model
+
+#### 3.3.1 JSON Schema
 ```json
 {
   "equipment_id": "uuid",
@@ -166,7 +249,7 @@ The API's are designed to support the operations of a broadcast news room, inclu
   }
 }
 ```
-#### Field Specifications
+#### 3.3.2 Field Specifications
 
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|--------------|
@@ -174,7 +257,7 @@ The API's are designed to support the operations of a broadcast news room, inclu
 | `type` | enum | Yes | Allowed values: [`CAMERA`, `MICROPHONE`, `LIGHTING`, `DRONE`, `OTHER`] | Mutable | `OTHER` | Technical classification that determines usage scenarios, staff allocation rules, and maintenance schedules |
 | `model` | string | Yes | Min length: 1 | Mutable | None | Manufacturer's model designation that identifies specific capabilities, compatibility, and replacement parts |
 | `status` | enum | Yes | Allowed values: [`AVAILABLE`, `IN_USE`, `MAINTENANCE`, `RETIRED`] | Mutable | `AVAILABLE` | Current operational state that controls whether the equipment can be allocated to staff or stories |
-| `last_maintenance_date` | timestamp | No | Valid past date with format YYYY-MM-DD | Mutable | null | Most recent service date used to schedule preventive maintenance and track equipment reliability |
+| `last_maintenance_date` | timestamp | No | Valid Date with timezone following format ISO 8601 format (YYYY-MM-DDThh:mm:ss.sssZ), UTC timezone | Mutable | null | Most recent service date used to schedule preventive maintenance and track equipment reliability |
 | `allocations` | array | No | Array of allocation objects | Mutable | [] | List of allocations for this equipment, enabling resource tracking and historical usage records |
 | `allocations[].allocated_to_story_id` | uuid | Yes (in allocation) | Must reference existing story | Mutable | None | Identifier of the story using this equipment, enabling resource tracking and content association. Relationship: Story |
 | `allocations[].allocated_to_staff_id` | uuid | Yes (in allocation) | Must reference existing staff member | Mutable | None | Identifier of the staff member responsible for this equipment, establishing accountability and usage tracking. Relationship: Staff |
@@ -186,6 +269,8 @@ The API's are designed to support the operations of a broadcast news room, inclu
 
 
 ### 3.4 Feed Model
+
+#### 3.4.1 JSON Schema
 ```json
 {
   "feed_id": "uuid",
@@ -208,7 +293,7 @@ The API's are designed to support the operations of a broadcast news room, inclu
 }
 ```
 
-#### Field Specifications
+#### 3.4.2 Field Specifications
 
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|--------------|
@@ -226,6 +311,8 @@ The API's are designed to support the operations of a broadcast news room, inclu
 
 
 ### 3.5 Broadcast Model
+
+#### 3.5.1 JSON Schema
 ```json
 {
   "broadcast_id": "uuid",
@@ -250,7 +337,7 @@ The API's are designed to support the operations of a broadcast news room, inclu
 }
 ```
 
-#### Field Specifications
+#### 3.5.2 Field Specifications
 
 | Field | Type | Required | Constraints | Mutability | Default | Description |
 |-------|------|----------|-------------|------------|---------|--------------|
@@ -286,6 +373,7 @@ The API's are designed to support the operations of a broadcast news room, inclu
 - A valid `allocation_date` is required for each allocation in the `allocations` array
 - For any date with an allocation, the equipment `status` will be `IN_USE` for that entire day
 - Cannot have multiple allocations on the same date
+- `last_maintenance_date` must be in the past when provided
 
 #### 4.1.4 Feed Model
 - If `peak_viewers` is provided, then `average_viewers` must be less than or equal to `peak_viewers`.
@@ -390,28 +478,6 @@ Rollback Scenarios:
 - Failed maintenance: Keep in "MAINTENANCE" status until resolved
 - Irreparable equipment: Change status to "RETIRED"
 
-### 4.5 Business Logic Triggers
-
-#### 4.5.1 Status Change Notifications
-- Story status changes (`Story.status`) notify all assigned staff (`assignment.assigned_staff_id`)
-- Broadcast status changes (`Broadcast.status`) alert all associated staff (`planning_details.assigned_staff_ids`)
-- Equipment status changes to `MAINTENANCE` or `RETIRED` notify technical staff
-- Feed status changes to `INACTIVE` notify broadcast planning team
-
-#### 4.5.2 Automatic Updates
-- For each equipment, if the current date matches any `allocation_date` in the `allocations` array, the equipment `status` is automatically set to `IN_USE`
-- For each equipment, if the current date does not match any `allocation_date` in the `allocations` array and the `status` is `IN_USE`, the status is automatically set to `AVAILABLE`
-- Moving Broadcast to `COMPLETED` automatically updates `metadata.updated_at`
-- Setting Story `status` to `ARCHIVED` automatically sets `metadata.deleted_at`
-- Changing Equipment status to `IN_USE` automatically sets `allocation.allocation_date` to current timestamp
-- Changing Staff status to `INACTIVE` automatically clears all assignments and equipment allocations
-
-#### 4.5.3 Cascading Actions
-- When a Story is archived, all associated Equipment allocations are automatically released
-- When a Broadcast is cancelled, all assigned Equipment is automatically de-allocated
-- When a Feed becomes inactive, all scheduled broadcasts using that feed are flagged for review
-- When Equipment is set to `RETIRED`, any pending maintenance records are automatically closed
-
 ### 4.6 Deletion Behavior
 
 #### 4.6.1 Story Model
@@ -423,9 +489,10 @@ Rollback Scenarios:
 - All Equipment allocations referencing the Story are automatically de-allocated
 - Story content is archived according to retention policies
 
-**Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Story content is preserved for archival purposes but not accessible through standard API endpoints
+**When a Story is marked for deletion (metadata.deleted_at populated):**
+- It should no longer appear in standard story listings unless include_deleted=true query parameter is provided
+- It remains in the database for historical reference and cannot be modified further
+- All references to the story in the system will exclude the deleted story from active operations
 
 #### 4.6.2 Staff Model
 
@@ -437,9 +504,10 @@ Rollback Scenarios:
 - Equipment allocations are automatically de-allocated
 - Story assignments are reassigned or flagged for review
 
-**Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Staff record is excluded from assignment options
+**When a Staff record is marked for deletion (metadata.deleted_at populated):**
+- It should no longer appear in standard staff listings unless include_deleted=true query parameter is provided
+- It remains in the database for historical reference and cannot be modified further
+- Staff ID is no longer available for new assignments or equipment allocations
 
 #### 4.6.3 Equipment Model
 
@@ -453,10 +521,10 @@ Rollback Scenarios:
 - All allocation history is preserved for record-keeping
 - Maintenance records are archived
 
-**Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Equipment is removed from available inventory
-- Historical usage data is preserved for reporting
+**When Equipment is marked for deletion (metadata.deleted_at populated):**
+- It should no longer appear in standard equipment listings unless include_deleted=true query parameter is provided
+- It remains in the database for historical reference but cannot be modified further
+- Equipment ID is removed from all allocation options and planning interfaces
 
 #### 4.6.4 Feed Model
 
@@ -468,10 +536,10 @@ Rollback Scenarios:
 - Historical audience metrics are preserved
 - Feed configuration data is archived
 
-**Effects When Deletion Succeeds:**
-- `deleted_at` timestamp is set to the current UTC time
-- Feed is removed from available broadcast options
-- Historical broadcast data is preserved with proper references
+**When a Feed is marked for deletion (metadata.deleted_at populated):**
+- It should no longer appear in standard feed listings unless include_deleted=true query parameter is provided
+- It remains in the database for historical reference and cannot be modified further
+- Feed ID becomes unavailable for new broadcasts
 
 #### 4.6.5 Broadcast Model
 
@@ -486,6 +554,12 @@ Rollback Scenarios:
 **Effects When Deletion Succeeds:**
 - `deleted_at` timestamp is set to the current UTC time
 - Historical broadcast data is preserved for compliance and reporting
+
+**When a Broadcast is marked for deletion (metadata.deleted_at populated):**
+- It should no longer appear in standard broadcast listings unless include_deleted=true query parameter is provided
+- It remains in the database for historical reference and compliance purposes but cannot be modified further
+- Associated resources (staff, equipment, feeds) are released from their broadcast commitments
+- The broadcast is excluded from all scheduling calendars and programming grids
 
 ### 4.7 Deletion Audit Requirements
 
@@ -610,13 +684,16 @@ URL: POST /api/v1/stories
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
 #### 5.1.2 Get Story  
 URL: GET /api/v1/stories/{storyId}
+
+**Query Parameters:**
+- include_deleted: boolean (optional, default: false) - Whether to include soft-deleted stories
 
 **Response Codes:**:  
 - 200 OK – Returns story details  
@@ -635,7 +712,7 @@ URL: GET /api/v1/stories/{storyId}
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
-    "deleted_at": null
+    "deleted_at": "timestamp"|null
   }
 }
 ```
@@ -648,11 +725,18 @@ URL: GET /api/v1/stories/{storyId}
   "message": "Story not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Story with ID {storyId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -726,7 +810,13 @@ URL: PATCH /api/v1/stories/{storyId}
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Cannot transition from PUBLISHED to DRAFT"
+  "errors": [
+    {
+      "id": "INVALID_STATUS_TRANSITION",
+      "field": "status",
+      "message": "Cannot transition from PUBLISHED to DRAFT"
+    }
+  ]
 }
 ```  
 - 422 Unprocessable Entity  
@@ -750,8 +840,8 @@ URL: PATCH /api/v1/stories/{storyId}
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -769,18 +859,31 @@ URL: DELETE /api/v1/stories/{storyId}
   "message": "Story not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Story with ID {storyId} has already been deleted."
+}
+```
 - 409 Conflict  
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Story is referenced by active broadcasts and cannot be deleted"
+  "errors": [
+    {
+      "id": "ACTIVE_BROADCAST_REFERENCE",
+      "field": "status",
+      "message": "Story is referenced by active broadcasts and cannot be deleted"
+    }
+  ]
 }
 ```  
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -807,10 +910,14 @@ URL: DELETE /api/v1/stories
     {
       "id": "uuid",
       "reason": "STORY_IN_USE"
+    },
+    {
+      "id": "uuid",
+      "reason": "STORY_ALREADY_DELETED"
     }
   ],
   "deleted_count": 2,
-  "failed_count": 2
+  "failed_count": 3
 }
 ```
 
@@ -825,8 +932,8 @@ URL: DELETE /api/v1/stories
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -898,27 +1005,42 @@ URL: POST /api/v1/staff
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Staff with this email already exists"
+  "errors": [
+    {
+      "id": "EMAIL_ALREADY_EXISTS",
+      "field": "email",
+      "message": "Staff with this email already exists"
+    }
+  ]
 }
 ```
 - 422 Unprocessable Entity
 ```json
 {
   "error_id": "UNPROCESSABLE_ENTITY",
-  "message": "Status is changed to active but phone is not provided"
+  "errors": [
+    {
+      "id": "MISSING_REQUIRED_FIELD",
+      "field": "phone",
+      "message": "Status is changed to active but phone is not provided"
+    }
+  ]
 }
 ```
 
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
 #### 5.2.2 Get Staff  
 URL: GET /api/v1/staff/{staffId}
+
+**Query Parameters:**
+- include_deleted: boolean (optional, default: false) - Whether to include soft-deleted staff
 
 **Response Codes:**:  
 - 200 OK – Returns staff details  
@@ -935,7 +1057,7 @@ URL: GET /api/v1/staff/{staffId}
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
-    "deleted_at": null
+    "deleted_at": "timestamp"|null
   }
 }
 ```
@@ -948,11 +1070,18 @@ URL: GET /api/v1/staff/{staffId}
   "message": "Staff not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Staff with ID {staffId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1026,8 +1155,8 @@ URL: PATCH /api/v1/staff/{staffId}
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1045,18 +1174,31 @@ URL: DELETE /api/v1/staff/{staffId}
   "message": "Staff not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Staff with ID {staffId} has already been deleted."
+}
+```
 - 409 Conflict  
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Staff is linked to a live broadcast"
+  "errors": [
+    {
+      "id": "STAFF_IN_USE",
+      "field": "status",
+      "message": "Staff is linked to a live broadcast"
+    }
+  ]
 }
 ```  
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1079,10 +1221,14 @@ URL: DELETE /api/v1/staff
     {
       "id": "uuid",
       "reason": "STAFF_ACTIVE_OR_REFERENCED"
+    },
+    {
+      "id": "uuid",
+      "reason": "STAFF_ALREADY_DELETED"
     }
   ],
   "deleted_count": 2,
-  "failed_count": 1
+  "failed_count": 2
 }
 ```
 
@@ -1097,8 +1243,77 @@ URL: DELETE /api/v1/staff
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
+}
+```
+
+#### 5.2.6 Get Staff Assignments
+URL: GET /api/v1/staff/{staffId}/assignments
+
+**Description:**
+Returns all story assignments for a specific staff member, providing details about each assigned story including its status, priority, and due date.
+
+**Query Parameters:**
+- status.eq: string (optional) - Filter assignments by story status (DRAFT, PUBLISHED, ARCHIVED)
+- priority.eq: string (optional) - Filter assignments by priority (LOW, HIGH)
+
+**Response Codes:**:  
+- 200 OK – Returns staff assignments
+```json
+{
+  "staff_id": "uuid",
+  "assignments": [
+    {
+      "story_id": "uuid",
+      "title": "string",
+      "status": "DRAFT|PUBLISHED|ARCHIVED",
+      "priority": "LOW|HIGH",
+      "due_date": "date"|null
+    }
+  ],
+  "total_count": "integer"
+}
+```
+
+**Possible Errors:**
+- 400 Bad Request  
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "INVALID_QUERY_PARAMETER",
+      "field": "status.eq",
+      "message": "Invalid status value provided"
+    },
+    {
+      "id": "INVALID_QUERY_PARAMETER",
+      "field": "priority.eq",
+      "message": "Invalid priority value provided"
+    }
+  ]
+}
+```
+- 404 Not Found  
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Staff not found"
+}
+```
+- 404 Resource Deleted  
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Staff with ID {staffId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
+- 500 Internal Server Error  
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1205,13 +1420,16 @@ URL: POST /api/v1/equipment
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
 #### 5.3.2 Get Equipment  
 URL: GET /api/v1/equipment/{equipmentId}
+
+**Query Parameters:**
+- include_deleted: boolean (optional, default: false) - Whether to include soft-deleted equipment
 
 **Response Codes:**:  
 - 200 OK – Returns equipment details  
@@ -1233,7 +1451,7 @@ URL: GET /api/v1/equipment/{equipmentId}
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
-    "deleted_at": null
+    "deleted_at": "timestamp"|null
   }
 }
 ```
@@ -1246,11 +1464,18 @@ URL: GET /api/v1/equipment/{equipmentId}
   "message": "Equipment not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Equipment with ID {equipmentId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1332,7 +1557,7 @@ URL: PATCH /api/v1/equipment/{equipmentId}
 - 403 Forbidden
 ```json
 {
-  "error_id": "FORBIDDEN",
+  "error_id": "RESOURCE_FORBIDDEN",
   "message": "Allocated staff does not have the role to access this equipment"
 }
 ```
@@ -1369,15 +1594,21 @@ URL: PATCH /api/v1/equipment/{equipmentId}
 - 422 Unprocessable Entity  
 ```json
 {
-  "error_id": "INVALID_RELATIONSHIP",
-  "message": "Referenced staff member does not exist or is inactive"
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "errors": [
+    {
+      "id": "INVALID_RELATIONSHIP",
+      "field": "allocated_to_staff_id",
+      "message": "Referenced staff member does not exist or is inactive"
+    }
+  ]
 }
 ```  
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1395,6 +1626,13 @@ URL: DELETE /api/v1/equipment/{equipmentId}
   "message": "Equipment not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Equipment with ID {equipmentId} has already been deleted."
+}
+```
 - 409 Conflict  
 ```json
 {
@@ -1421,8 +1659,8 @@ URL: DELETE /api/v1/equipment/{equipmentId}
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1445,10 +1683,14 @@ URL: DELETE /api/v1/equipment
     {
       "id": "uuid",
       "reason": "EQUIPMENT_IN_USE"
+    },
+    {
+      "id": "uuid",
+      "reason": "EQUIPMENT_ALREADY_DELETED"
     }
   ],
   "deleted_count": 2,
-  "failed_count": 1
+  "failed_count": 2
 }
 ```
 
@@ -1463,8 +1705,131 @@ URL: DELETE /api/v1/equipment
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
+}
+```
+
+#### 5.3.6 Allocate Equipment
+URL: POST /api/v1/equipment/{equipmentId}/allocate
+
+**Request Body Schema:**
+```json
+{
+  "allocated_to_staff_id": "uuid",     // Required - ID of the staff to whom the equipment is allocated
+  "allocated_to_story_id": "uuid",     // Required - ID of the story for which the equipment is allocated
+  "allocation_date": "date"            // Required - Date when the equipment is allocated
+}
+```
+
+**Response Codes:**:  
+- 200 OK – Equipment successfully allocated
+```json
+{
+  "equipment_id": "uuid",
+  "type": "CAMERA|MICROPHONE|LIGHTING|DRONE|OTHER",
+  "model": "string",
+  "status": "AVAILABLE|IN_USE|MAINTENANCE|RETIRED",
+  "allocations": [
+    {
+      "allocated_to_staff_id": "uuid",
+      "allocated_to_story_id": "uuid",
+      "allocation_date": "date"
+    }
+  ],
+  "metadata": {
+    "created_at": "timestamp",
+    "updated_at": "timestamp",
+    "deleted_at": null
+  }
+}
+```
+
+**Possible Errors:**
+- 400 Bad Request  
+```json
+{
+  "error_id": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "id": "MISSING_STAFF_ID",
+      "field": "allocated_to_staff_id",
+      "message": "Staff ID is required"
+    },
+    {
+      "id": "MISSING_STORY_ID",
+      "field": "allocated_to_story_id",
+      "message": "Story ID is required"
+    },
+    {
+      "id": "MISSING_ALLOCATION_DATE",
+      "field": "allocation_date",
+      "message": "Allocation date is required"
+    },
+    {
+      "id": "INVALID_DATE_FORMAT",
+      "field": "allocation_date",
+      "message": "Allocation date must be in YYYY-MM-DD format"
+    }
+  ]
+}
+```
+- 403 Forbidden  
+```json
+{
+  "error_id": "RESOURCE_FORBIDDEN",
+  "errors": [
+    {
+      "id": "STAFF_ROLE_MISMATCH",
+      "field": "allocated_to_staff_id",
+      "message": "Allocated staff does not have the role to access this equipment"
+    }
+  ]
+}
+```
+- 404 Not Found  
+```json
+{
+  "error_id": "RESOURCE_NOT_FOUND",
+  "message": "Equipment not found"
+}
+```
+- 409 Conflict  
+```json
+{
+  "error_id": "RESOURCE_CONFLICT",
+  "errors": [
+    {
+      "id": "EQUIPMENT_UNAVAILABLE",
+      "field": "status",
+      "message": "Equipment is not available for allocation (status is not AVAILABLE)"
+    }
+  ]
+}
+```
+- 422 Unprocessable Entity  
+```json
+{
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "errors": [
+    {
+      "id": "INVALID_RELATIONSHIP",
+      "field": "allocated_to_staff_id",
+      "message": "Referenced staff member does not exist or is inactive"
+    },
+    {
+      "id": "INVALID_RELATIONSHIP",
+      "field": "allocated_to_story_id",
+      "message": "Referenced story does not exist"
+    }
+  ]
+}
+```
+- 500 Internal Server Error  
+```json
+{
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1530,19 +1895,28 @@ URL: POST /api/v1/feeds
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Feed with this name already exists"
+  "errors": [
+    {
+      "id": "FEED_NAME_EXISTS",
+      "field": "name",
+      "message": "Feed with this name already exists"
+    }
+  ]
 }
 ```  
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
 #### 5.4.2 Get Feed  
 URL: GET /api/v1/feeds/{feedId}
+
+**Query Parameters:**
+- include_deleted: boolean (optional, default: false) - Whether to include soft-deleted feeds
 
 **Response Codes:**:  
 - 200 OK – Returns feed details  
@@ -1563,7 +1937,7 @@ URL: GET /api/v1/feeds/{feedId}
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
-    "deleted_at": null
+    "deleted_at": "timestamp"|null
   }
 }
 ```
@@ -1576,11 +1950,18 @@ URL: GET /api/v1/feeds/{feedId}
   "message": "Feed not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Feed with ID {feedId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1658,21 +2039,33 @@ URL: PATCH /api/v1/feeds/{feedId}
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Feed with this name already exists"
+  "errors": [
+    {
+      "id": "FEED_NAME_EXISTS",
+      "field": "name",
+      "message": "Feed with this name already exists"
+    }
+  ]
 }
 ```
 - 422 Unprocessable Entity  
 ```json
 {
   "error_id": "UNPROCESSABLE_ENTITY",
-  "message": "Average viewers must be less than or equal to peak viewers"
+  "errors": [
+    {
+      "id": "INVALID_METRIC_RELATIONSHIP",
+      "field": "audience_metrics.average_viewers",
+      "message": "Average viewers must be less than or equal to peak viewers"
+    }
+  ]
 }
 ```  
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1690,11 +2083,18 @@ URL: DELETE /api/v1/feeds/{feedId}
   "message": "Feed not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Feed with ID {feedId} has already been deleted."
+}
+```
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1717,10 +2117,14 @@ URL: DELETE /api/v1/feeds
     {
       "id": "uuid",
       "reason": "FEED_ACTIVE_OR_REFERENCED"
+    },
+    {
+      "id": "uuid",
+      "reason": "FEED_ALREADY_DELETED"
     }
   ],
   "deleted_count": 2,
-  "failed_count": 1
+  "failed_count": 2
 }
 ```
 
@@ -1735,8 +2139,8 @@ URL: DELETE /api/v1/feeds
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1815,7 +2219,7 @@ URL: POST /api/v1/broadcasts
 - 422 Unprocessable Entity  
 ```json
 {
-  "error_id": "INVALID_RELATIONSHIP",
+  "error_id": "UNPROCESSABLE_ENTITY",
   "errors": [
     {
       "id": "INACTIVE_FEED",
@@ -1833,13 +2237,16 @@ URL: POST /api/v1/broadcasts
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
 #### 5.5.2 Get Broadcast  
 URL: GET /api/v1/broadcasts/{broadcastId}
+
+**Query Parameters:**
+- include_deleted: boolean (optional, default: false) - Whether to include soft-deleted broadcasts
 
 **Response Codes:**:  
 - 200 OK – Returns broadcast details  
@@ -1860,7 +2267,7 @@ URL: GET /api/v1/broadcasts/{broadcastId}
   "metadata": {
     "created_at": "timestamp",
     "updated_at": "timestamp",
-    "deleted_at": null
+    "deleted_at": "timestamp"|null
   }
 }
 ```
@@ -1873,11 +2280,18 @@ URL: GET /api/v1/broadcasts/{broadcastId}
   "message": "Broadcast not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Broadcast with ID {broadcastId} has been deleted. Use include_deleted=true query parameter to retrieve deleted resources."
+}
+```
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1959,15 +2373,21 @@ URL: PATCH /api/v1/broadcasts/{broadcastId}
 - 422 Unprocessable Entity  
 ```json
 {
-  "error_id": "INVALID_RELATIONSHIP",
-  "message": "Referenced staff members do not exist or are inactive"
+  "error_id": "UNPROCESSABLE_ENTITY",
+  "errors": [
+    {
+      "id": "INVALID_RELATIONSHIP",
+      "field": "staff_ids",
+      "message": "Referenced staff members do not exist or are inactive"
+    }
+  ]
 }
 ```  
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -1985,18 +2405,31 @@ URL: DELETE /api/v1/broadcasts/{broadcastId}
   "message": "Broadcast not found"
 }
 ```  
+- 404 Resource Deleted:
+```json
+{
+  "error_id": "RESOURCE_DELETED",
+  "message": "Broadcast with ID {broadcastId} has already been deleted."
+}
+```
 - 409 Conflict  
 ```json
 {
   "error_id": "RESOURCE_CONFLICT",
-  "message": "Broadcast deletion prevented if status is LIVE or associated resources are active"
+  "errors": [
+    {
+      "id": "BROADCAST_STATUS_CONFLICT",
+      "field": "status",
+      "message": "Broadcast deletion prevented if status is LIVE or associated resources are active"
+    }
+  ]
 }
 ```  
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -2023,10 +2456,14 @@ URL: DELETE /api/v1/broadcasts
     {
       "id": "uuid",
       "reason": "BROADCAST_SCHEDULED_FUTURE"
+    },
+    {
+      "id": "uuid",
+      "reason": "BROADCAST_ALREADY_DELETED"
     }
   ],
   "deleted_count": 2,
-  "failed_count": 2
+  "failed_count": 3
 }
 ```
 
@@ -2041,8 +2478,8 @@ URL: DELETE /api/v1/broadcasts
 - 500 Internal Server Error  
 ```json
 {
-  "error_id": "SERVER_ERROR",
-  "message": "An unexpected error occurred"
+  "error_id": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected error occurred while processing the request. Please try again later."
 }
 ```
 
@@ -2189,7 +2626,7 @@ Content-Type: application/json
 
 {
   "equipment_id": "3e4f5g6h-7i8j-9k0l-1m2n-3o4p5q6r7s8t",
-  "status": "AVAILABLE",
+  "status": "IN_USE",
   "allocations": [
     {
       "allocated_to_staff_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
@@ -2491,7 +2928,7 @@ Content-Type: application/json
 
 {
   "equipment_id": "3e4f5g6h-7i8j-9k0l-1m2n-3o4p5q6r7s8t",
-  "status": "AVAILABLE",
+  "status": "IN_USE",
   "allocations": [
     {
       "allocated_to_staff_id": "b5f8c1d2-e3f4-5a6b-7c8d-9e0f1a2b3c4d",
